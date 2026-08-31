@@ -11,7 +11,7 @@ except ImportError:
 
 
 class GeminiProvider(BaseProvider):
-    """Google Gemini API entegrasyon sağlayıcısı."""
+    """Google Gemini API entegrasyon sağlayıcısı (Google GenAI Chat SDK Uyumlu)."""
 
     def analyze(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
@@ -36,12 +36,19 @@ class GeminiProvider(BaseProvider):
                 budget = budget_map.get(effort_str, 4096) if isinstance(self.reasoning_effort, str) else self.reasoning_effort
                 config_kwargs["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=budget)
 
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=user_prompt,
-                config=genai_types.GenerateContentConfig(**config_kwargs)
-            )
-            
+            gen_config = genai_types.GenerateContentConfig(**config_kwargs)
+
+            # Google GenAI SDK Tavsiyesi: AFC / Structured Output için Chat.send_message kullanımı
+            try:
+                chat = client.chats.create(model=self.model_name, config=gen_config)
+                response = chat.send_message(user_prompt)
+            except Exception:
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_prompt,
+                    config=gen_config
+                )
+
             raw_text = response.text if hasattr(response, "text") and response.text else "{}"
             json_str = self._extract_json(raw_text)
             report = BDRRiskAnalysisReport.model_validate_json(json_str)
