@@ -12,7 +12,7 @@ from prompts.schemas import (
 
 
 class BDRAnalyzer:
-    """BDR metinlerini Markdown (.md) prompt şablonları üzerinden analiz eden motor."""
+    """BDR metinlerini top_p, repetition_penalty, reasoning_effort ve strict JSON schema ile analiz eden motor."""
 
     EFFORT_TOKEN_MAP = {
         "low": 1024,
@@ -38,6 +38,8 @@ class BDRAnalyzer:
         self.prompt_file = self.model_config.get("prompt_file", "bdr_analyst_v1.md")
         self.api_key = Config.get_api_key_for_model(self.model_config)
         self.temperature = self.model_config.get("temperature", 0.1)
+        self.top_p = self.model_config.get("top_p", 0.9)
+        self.repetition_penalty = self.model_config.get("repetition_penalty", 1.0)
         self.reasoning_effort = self.model_config.get("reasoning_effort", "medium")
         self.strict_schema = self.model_config.get("strict_schema", True)
 
@@ -75,6 +77,7 @@ class BDRAnalyzer:
             print(f"[UYARI] {self.model_name} için GEMINI_API_KEY bulunamadı. Mock rapor üretiliyor...")
             return self._generate_mock_report(user_prompt)
 
+        # 1. Yeni SDK Desteği (google-genai)
         try:
             from google import genai
             from google.genai import types
@@ -85,6 +88,7 @@ class BDRAnalyzer:
                 "response_mime_type": "application/json",
                 "response_schema": BDRRiskAnalysisReport,
                 "temperature": self.temperature,
+                "top_p": self.top_p,
             }
 
             if hasattr(types, "ThinkingConfig"):
@@ -98,9 +102,22 @@ class BDRAnalyzer:
                 config=types.GenerateContentConfig(**config_kwargs)
             )
             return BDRRiskAnalysisReport.model_validate_json(response.text)
-        except Exception as e:
-            print(f"[HATA] Gemini API ({self.model_name}): {e}")
-            return self._generate_mock_report(user_prompt)
+        except Exception as e1:
+            # 2. Klasik SDK Fallback (google-generativeai)
+            try:
+                import google.generativeai as genai_legacy
+                genai_legacy.configure(api_key=self.api_key)
+                model = genai_legacy.GenerativeModel(
+                    model_name=self.model_name,
+                    system_instruction=self.system_prompt,
+                    generation_config={"temperature": self.temperature, "top_p": self.top_p}
+                )
+                response = model.generate_content(user_prompt)
+                json_str = self._extract_json(response.text)
+                return BDRRiskAnalysisReport.model_validate_json(json_str)
+            except Exception as e2:
+                print(f"[HATA] Gemini API ({self.model_name}): SDK1: {e1} | SDK2: {e2}")
+                return self._generate_mock_report(user_prompt)
 
     def _analyze_with_openai(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
@@ -119,11 +136,13 @@ class BDRAnalyzer:
                 ],
                 "response_format": BDRRiskAnalysisReport,
                 "temperature": self.temperature,
+                "top_p": self.top_p,
             }
 
             if "o1" in self.model_name or "o3" in self.model_name:
                 completion_kwargs["reasoning_effort"] = str(self.reasoning_effort).lower()
                 completion_kwargs.pop("temperature", None)
+                completion_kwargs.pop("top_p", None)
 
             completion = client.beta.chat.completions.parse(**completion_kwargs)
             return completion.choices[0].message.parsed
@@ -146,6 +165,7 @@ class BDRAnalyzer:
                 model=self.model_name,
                 max_tokens=self.model_config.get("max_tokens", 4096),
                 temperature=self.temperature,
+                top_p=self.top_p,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
             )
@@ -164,14 +184,34 @@ class BDRAnalyzer:
             from huggingface_hub import InferenceClient
             client = InferenceClient(model=self.model_name, token=self.api_key)
             schema_str = json.dumps(BDRRiskAnalysisReport.model_json_schema(), ensure_ascii=False)
-            prompt = f"System: {self.system_prompt}\nStrict JSON Schema:\n{schema_str}\nUser: {user_prompt}\nAssistant:"
             
-            response = client.text_generation(
-                prompt=prompt,
-                max_new_tokens=2048,
-                temperature=self.temperature,
-            )
-            json_str = self._extract_json(response)
+            # 1. Chat Completion API Desteği (Conversational & Instruct Modeller İçin)
+            try:
+                response_chat = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": f"{self.system_prompt}\nJSON Schema:\n{schema_str}"},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=self.model_config.get("max_tokens", 4096),
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                )
+                raw_text = response_chat.choices[0].message.content
+            except Exception:
+                # 2. Text Generation Fallback
+                prompt = f"System: {self.system_prompt}\nStrict JSON Schema:\n{schema_str}\nUser: {user_prompt}\nAssistant:"
+                hf_params = {
+                    "prompt": prompt,
+                    "max_new_tokens": self.model_config.get("max_tokens", 4096),
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                }
+                if self.repetition_penalty != 1.0:
+                    hf_params["repetition_penalty"] = self.repetition_penalty
+
+                raw_text = client.text_generation(**hf_params)
+
+            json_str = self._extract_json(raw_text)
             return BDRRiskAnalysisReport.model_validate_json(json_str)
         except Exception as e:
             print(f"[HATA] HuggingFace API ({self.model_name}): {e}")
@@ -263,7 +303,7 @@ class BDRAnalyzer:
     def format_report_as_markdown(self, report: BDRRiskAnalysisReport) -> str:
         lines = [
             "# 📊 BDR Kredi Komitesi Risk Değerlendirme Raporu",
-            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, Reasoning: `{self.reasoning_effort}`)",
+            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, Reasoning: `{self.reasoning_effort}`, Temp: `{self.temperature}`, Top-p: `{self.top_p}`, Repetition Penalty: `{self.repetition_penalty}`)",
             f"**Analiz Süresi:** `{report.analiz_suresi_saniye} saniye`",
             f"**Firma Adı:** {report.firma_adi}",
             f"**Rapor Dönemi:** {report.rapor_donemi}",

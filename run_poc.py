@@ -18,7 +18,7 @@ from finside.report_writer import ReportWriter
 
 def main():
     parser = argparse.ArgumentParser(description="Finside AI — BDR Analiz & Model Performans Motoru")
-    parser.add_argument("--input", "-i", type=str, default=str(Config.DATA_DIR / "borusan_bdr_2024.txt"))
+    parser.add_argument("--input", "-i", type=str, default=str(Config.DATA_DIR / "0f7bfcfebe7f422aa56aba17a28c610c.txt"))
     parser.add_argument("--model_id", "-m", type=str, default=None)
     parser.add_argument("--mock", action="store_true")
     args = parser.parse_args()

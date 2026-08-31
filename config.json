@@ -2,27 +2,72 @@
   "app_name": "Finside-AI POC Motoru",
   "default_temperature": 0.1,
   "default_max_tokens": 4096,
+  "default_top_p": 0.9,
+  "default_repetition_penalty": 1.0,
   "default_reasoning_effort": "medium",
   "default_strict_schema": true,
   "default_prompt_file": "bdr_analyst_v1.md",
   "models": [
     {
-      "id": "gemini-2.5-pro",
-      "name": "Google Gemini 2.5 Pro",
+      "id": "gemini-3.6-flash",
+      "name": "Google Gemini 3.6 Flash",
       "provider": "gemini",
-      "model_name": "gemini-2.5-pro",
+      "model_name": "gemini-3.6-flash",
       "api_key_env": "GEMINI_API_KEY",
-      "reasoning_effort": "high",
+      "reasoning_effort": "low",
+      "temperature": 0.1,
+      "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
       "enabled": true
     },
     {
-      "id": "gemini-1.5-flash",
-      "name": "Google Gemini 1.5 Flash",
+      "id": "gemini-3.1-pro-preview",
+      "name": "Google Gemini 3.1 Pro",
       "provider": "gemini",
-      "model_name": "gemini-1.5-flash",
+      "model_name": "gemini-3.1-pro-preview",
       "api_key_env": "GEMINI_API_KEY",
-      "reasoning_effort": "low",
+      "reasoning_effort": "high",
+      "temperature": 0.1,
+      "top_p": 0.9,
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": false
+    },
+    {
+      "id": "hf-qwen-2.5-7b",
+      "name": "HuggingFace Qwen2.5-7B (Açık Kaynak API)",
+      "provider": "huggingface",
+      "model_name": "Qwen/Qwen2.5-7B-Instruct",
+      "api_key_env": "HF_TOKEN",
+      "temperature": 0.3,
+      "repetition_penalty": 1.05,
+      "top_p": 0.9,
+      "reasoning_effort": "auto",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": false
+    },
+    {
+      "id": "hf-commencis-llm",
+      "name": "HuggingFace Commencis-LLM (Türkçe LLM)",
+      "provider": "huggingface",
+      "model_name": "Commencis/Commencis-LLM",
+      "api_key_env": "HF_TOKEN",
+      "temperature": 0.5,
+      "repetition_penalty": 1.0,
+      "top_p": 0.9,
+      "reasoning_effort": "medium",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": true
+    },
+    {
+      "id": "hf-mihenk-financial-35b",
+      "name": "HuggingFace Mihenk-LLM-v2-35B (Türkçe Finansal Model)",
+      "provider": "huggingface",
+      "model_name": "AlicanKiraz0/Mihenk-LLM-v2-35B-A3B-Turkish-Financial-Model",
+      "api_key_env": "HF_TOKEN",
+      "temperature": 0.3,
+      "repetition_penalty": 1.05,
+      "top_p": 0.9,
+      "reasoning_effort": "high",
       "prompt_file": "bdr_analyst_v1.md",
       "enabled": true
     },
@@ -45,16 +90,6 @@
       "reasoning_effort": "medium",
       "prompt_file": "bdr_analyst_v1.md",
       "enabled": false
-    },
-    {
-      "id": "hf-qwen-2.5-7b",
-      "name": "HuggingFace Qwen2.5-7B (Açık Kaynak API)",
-      "provider": "huggingface",
-      "model_name": "Qwen/Qwen2.5-7B-Instruct",
-      "api_key_env": "HF_TOKEN",
-      "reasoning_effort": "auto",
-      "prompt_file": "bdr_analyst_v1.md",
-      "enabled": true
     }
   ]
 }

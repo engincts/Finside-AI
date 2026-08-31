@@ -26,6 +26,8 @@ class Config:
         defaults = {
             "temperature": config.get("default_temperature", 0.1),
             "max_tokens": config.get("default_max_tokens", 4096),
+            "top_p": config.get("default_top_p", 0.9),
+            "repetition_penalty": config.get("default_repetition_penalty", 1.0),
             "reasoning_effort": config.get("default_reasoning_effort", "medium"),
             "strict_schema": config.get("default_strict_schema", True),
             "prompt_file": config.get("default_prompt_file", "bdr_analyst_v1.md")
