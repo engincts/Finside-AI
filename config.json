@@ -1,0 +1,60 @@
+{
+  "app_name": "Finside-AI POC Motoru",
+  "default_temperature": 0.1,
+  "default_max_tokens": 4096,
+  "default_reasoning_effort": "medium",
+  "default_strict_schema": true,
+  "default_prompt_file": "bdr_analyst_v1.md",
+  "models": [
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Google Gemini 2.5 Pro",
+      "provider": "gemini",
+      "model_name": "gemini-2.5-pro",
+      "api_key_env": "GEMINI_API_KEY",
+      "reasoning_effort": "high",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": true
+    },
+    {
+      "id": "gemini-1.5-flash",
+      "name": "Google Gemini 1.5 Flash",
+      "provider": "gemini",
+      "model_name": "gemini-1.5-flash",
+      "api_key_env": "GEMINI_API_KEY",
+      "reasoning_effort": "low",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": true
+    },
+    {
+      "id": "gpt-4o",
+      "name": "OpenAI GPT-4o",
+      "provider": "openai",
+      "model_name": "gpt-4o",
+      "api_key_env": "OPENAI_API_KEY",
+      "reasoning_effort": "high",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": false
+    },
+    {
+      "id": "claude-3-5-sonnet",
+      "name": "Anthropic Claude 3.5 Sonnet",
+      "provider": "anthropic",
+      "model_name": "claude-3-5-sonnet-20241022",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "reasoning_effort": "medium",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": false
+    },
+    {
+      "id": "hf-qwen-2.5-7b",
+      "name": "HuggingFace Qwen2.5-7B (Açık Kaynak API)",
+      "provider": "huggingface",
+      "model_name": "Qwen/Qwen2.5-7B-Instruct",
+      "api_key_env": "HF_TOKEN",
+      "reasoning_effort": "auto",
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": true
+    }
+  ]
+}
