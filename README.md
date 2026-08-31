@@ -4,26 +4,40 @@ Finside AI, kurumsal kredi tahsis süreçlerinde kullanılan yapılandırılmı�
 
 ---
 
-## 🚀 FAZ 1 — POC (Mevcut Aşama)
+## 🚀 Max Tokens & Muhakeme Kapasitesi (8192 - 16384 Tokens)
 
-POC fazının ana hedefi; BDR metinlerini okuyup kıdemli bir kurumsal kredi risk analisti gözüyle riskleri tespit eden, süre/latans metriklerini ölçen ve kredi komitesi diliyle değerlendiren LLM tabanlı **"Finansal Analiz Uzmanı"** motorunu geliştirmektir.
+Modellerin çıktı uzunluğu ve derin muhakeme (reasoning effort) tavanı maksimum seviyeye yükseltilmiştir:
 
-### ✨ Türkçe Finansal Modeller & Gelişmiş Parametre Desteği
+- **Google Gemini (3.6 Flash / 3.1 Pro)**: `16,384 max_tokens` + `high reasoning_effort`
+- **OpenAI (GPT-4o, o3-mini)**: `16,384 max_tokens` + `high reasoning_effort`
+- **Anthropic (Claude 3.5 Sonnet)**: `8,192 max_tokens`
+- **Açık Kaynak Lider Modeller (Qwen 72B, Llama 3.3 70B, Qwen3 32B, Gemma 3 27B, DeepSeek V3)**: `8,192 max_tokens`
 
-- **Açık Kaynak Türkçe LLM Entegrasyonu**:
-  - `Commencis/Commencis-LLM` (Türkçe Genel/Finansal LLM)
-  - `AlicanKiraz0/Mihenk-LLM-v2-35B-A3B-Turkish-Financial-Model` (Özel Türkçe Finansal LLM)
-  - `Qwen/Qwen2.5-7B-Instruct`
-- **Gelişmiş Çıkarım (Inference) Parametre Ezme Desteği**:
-  - `temperature` (Örn: Commencis için `0.5`, Mihenk için `0.3`)
-  - `top_p` (Örn: `0.9` nucleus sampling)
-  - `repetition_penalty` (Örn: `1.0` - `1.05` tekrar önleme cezası)
-  - `reasoning_effort` (`"high"`, `"medium"`, `"low"`, `"auto"`)
-- **Net Sorumluluk Ayrımı (.env vs. config.json)**:
-  - **`.env`**: **Sadece gizli anahtarlar ve API Key'ler** tutulur (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`).
-  - **`config.json`**: Tüm operasyonel model parametreleri yönetilir.
-- **Saf Markdown Prompt Mimarisi (`prompts/*.md`)**: Prompt'lar `prompts/bdr_analyst_v1.md` dosyasında `## SYSTEM_PROMPT` ve `## USER_PROMPT` standartlarında tutulur.
-- **Hiyerarşik Çıktı Düzenlemesi (`outputs/Tarih/Saat/BDR_Adi/`)**: `outputs/YYYY-MM-DD/HH-MM-SS/{bdr_adi}/` yapısında oturum klasörleri ve `summary_metrics.md` özet raporları üretilir.
+---
+
+## 📦 Proje Bağımlılıkları (`requirements.txt`)
+
+1. **Temel Şema & Konfigürasyon**: `pydantic>=2.0.0`, `python-dotenv>=1.0.0`
+2. **Kapalı Kaynak LLM SDK'ları**: `google-genai>=0.1.0`, `google-generativeai>=0.8.0`, `openai>=1.0.0`, `anthropic>=0.20.0`
+3. **Açık Kaynak & Serverless Inference**: `huggingface-hub>=0.20.0`
+4. **Web UI & Dashboard**: `streamlit>=1.30.0`, `pandas>=2.0.0`
+5. **HTTP & Ağ Katmanı**: `requests>=2.28.0`, `httpx>=0.25.0`
+
+---
+
+## 🚀 Başlatma Yöntemleri
+
+### 1. PowerShell Tek Tıkla Başlatma (Tavsiye Edilen)
+```powershell
+.\run.ps1
+```
+
+### 2. Manuel Web Arayüzü Başlatma
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+Arayüz tarayıcınızda otomatik olarak **`http://localhost:8501`** adresinde açılacaktır.
 
 ---
 
@@ -32,82 +46,41 @@ POC fazının ana hedefi; BDR metinlerini okuyup kıdemli bir kurumsal kredi ris
 ```
 Finside-AI/
 ├── README.md                  # Proje dokümantasyonu (Canlı Referans)
+├── app.py                     # Web Kullanıcı Arayüzü & Dinamik Prompt Düzenleyici
+├── run.ps1                    # PowerShell Tek Tıkla Kurulum ve Başlatma Betiği
 ├── .env.example               # SADECE API Key / Gizli Bilgiler Şablonu
 ├── .gitignore                 # Git kapsamı dışındaki dosyalar (.venv, outputs vb.)
-├── config.json                # Dinamik model, parametre (top_p, repetition_penalty) ve prompt konfigürasyonu
+├── config.json                # Tüm Açık & Kapalı Kaynak LLM Konfigürasyonu
 ├── config.py                  # Konfigürasyon ve Env okuyucu
-├── requirements.txt           # Python bağımlılıkları
+├── requirements.txt           # Tüm Python Bağımlılıkları Listesi
+├── docs/
+│   └── BENCHMARK_RESEARCH.md  # Açık & Kapalı Kaynak LLM Benchmark Özet Raporu
 ├── data/
 │   └── bdr_samples/           # BDR txt test verileri (Borusan 2024 BDR örneği dahil)
 ├── prompts/
-│   ├── bdr_analyst_v1.md      # SYSTEM_PROMPT ve USER_PROMPT İçeren Markdown Şablonu
-│   └── schemas.py             # Türkiye BDR Standartlarında Pydantic Rapor Şemaları
+│   ├── bdr_analyst_v1.md      # Dinamik Dipnot İçeren İyileştirilmiş BDR Prompt Şablonu
+│   └── schemas.py             # Pydantic Rapor Şemaları ve Esnek Enum Validator'ları
 ├── src/
 │   └── finside/
-│       ├── prompt_loader.py   # Markdown prompt şablon yükleyici (.md)
-│       ├── bdr_loader.py      # BDR metin yükleyici
-│       ├── analyzer.py        # Multi-API analiz ve süre ölçüm motoru
-│       └── report_writer.py   # Dosya I/O ve metrik rapor yazıcı
+│       ├── loaders/           # Veri & Prompt Yükleyici Modülleri (SRP & DIP)
+│       │   ├── __init__.py
+│       │   ├── base_loader.py # BaseLoader Soyut Sınıfı
+│       │   ├── bdr_loader.py  # BDR Metin Yükleyici
+│       │   └── prompt_loader.py # Prompt Şablon Yükleyici
+│       ├── providers/         # SOLID Strategy & Factory LLM Sağlayıcı Modülleri
+│       │   ├── __init__.py
+│       │   ├── base.py        # BaseProvider Soyut Sınıfı (8192-16384 Max Tokens)
+│       │   ├── gemini_provider.py
+│       │   ├── openai_provider.py
+│       │   ├── anthropic_provider.py
+│       │   ├── huggingface_provider.py
+│       │   ├── mock_provider.py
+│       │   └── factory.py     # ProviderFactory Fabrika Sınıfı
+│       ├── writers/           # Dosya I/O & Rapor Yazıcı Modülleri
+│       │   ├── __init__.py
+│       │   └── report_writer.py
+│       ├── analyzer.py        # SOLID Orchestrator
+│       └── __init__.py
 ├── outputs/                   # Tarih ve saat bazlı hiyerarşik klasörler
 └── run_poc.py                 # CLI orkestratör betiği
 ```
-
----
-
-## ⚙️ `config.json` Yapılandırma Örneği
-
-```json
-{
-  "app_name": "Finside-AI POC Motoru",
-  "default_temperature": 0.1,
-  "default_max_tokens": 4096,
-  "default_top_p": 0.9,
-  "default_repetition_penalty": 1.0,
-  "default_reasoning_effort": "medium",
-  "default_strict_schema": true,
-  "default_prompt_file": "bdr_analyst_v1.md",
-  "models": [
-    {
-      "id": "hf-commencis-llm",
-      "name": "HuggingFace Commencis-LLM (Türkçe LLM)",
-      "provider": "huggingface",
-      "model_name": "Commencis/Commencis-LLM",
-      "api_key_env": "HF_TOKEN",
-      "temperature": 0.5,
-      "repetition_penalty": 1.0,
-      "top_p": 0.9,
-      "enabled": true
-    },
-    {
-      "id": "hf-mihenk-financial-35b",
-      "name": "HuggingFace Mihenk-LLM-v2-35B (Türkçe Finansal Model)",
-      "provider": "huggingface",
-      "model_name": "AlicanKiraz0/Mihenk-LLM-v2-35B-A3B-Turkish-Financial-Model",
-      "api_key_env": "HF_TOKEN",
-      "temperature": 0.3,
-      "repetition_penalty": 1.05,
-      "top_p": 0.9,
-      "enabled": true
-    }
-  ]
-}
-```
-
----
-
-## 🛠️ Kurulum & Kullanım
-
-1. **Gereksinimlerin Yüklenmesi**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **BDR Analizini Çalıştırma**:
-   ```bash
-   python run_poc.py --input data/bdr_samples/borusan_bdr_2024.txt
-   ```
-
-   *Mock modda test etmek için:*
-   ```bash
-   python run_poc.py --input data/bdr_samples/borusan_bdr_2024.txt --mock
-   ```

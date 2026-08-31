@@ -1,0 +1,327 @@
+import os
+import sys
+from pathlib import Path
+
+os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+import streamlit as st
+import json
+
+# Set Streamlit Page Configuration
+st.set_page_config(
+    page_title="Finside AI — Kurumsal Kredi Tahsis Karar Destek",
+    page_icon="🏦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Set Path Resolution
+ROOT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "src"))
+
+from config import Config
+from finside.loaders import BDRLoader, PromptLoader
+from finside.analyzer import BDRAnalyzer
+from finside.writers import ReportWriter
+
+
+# Custom Executive UI CSS Styling
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #1E3A8A;
+        margin-bottom: 0.2rem;
+    }
+    .sub-header {
+        font-size: 1.1rem;
+        color: #475569;
+        margin-bottom: 1.5rem;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Application Header
+st.markdown('<div class="main-header">🏦 Finside AI — Kurumsal Kredi Tahsis Karar Destek</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">BDR Dipnot Analizi, Kalitatif Risk Çıkarımı ve Multi-LLM Performans Karşılaştırma Paneli</div>', unsafe_allow_html=True)
+
+# LOAD INITIAL PROMPT TEMPLATE
+PROMPT_FILE_NAME = "bdr_analyst_v1.md"
+default_system_prompt, default_user_template = PromptLoader.load_prompt_md(PROMPT_FILE_NAME)
+
+if "active_system_prompt" not in st.session_state:
+    st.session_state.active_system_prompt = default_system_prompt
+
+if "active_user_template" not in st.session_state:
+    st.session_state.active_user_template = default_user_template
+
+# SIDEBAR: Configuration & Model Selections
+st.sidebar.image("https://img.icons8.com/color/96/000000/bank-building.png", width=70)
+st.sidebar.title("⚙️ Kontrol Paneli")
+
+# 1. Input BDR File Selector / Uploader
+st.sidebar.subheader("📄 1. BDR Metin Dosyası Seçimi")
+data_dir_files = list(Config.DATA_DIR.glob("*.txt"))
+file_options = [f.name for f in data_dir_files]
+
+selected_sample = st.sidebar.selectbox("Test BDR Dosyası Seçin", options=file_options, index=0)
+uploaded_file = st.sidebar.file_uploader("Veya Kendi BDR (.txt) Dosyanızı Yükleyin", type=["txt"])
+
+if uploaded_file is not None:
+    bdr_content = uploaded_file.getvalue().decode("utf-8")
+    bdr_name = uploaded_file.name
+else:
+    sample_path = Config.DATA_DIR / selected_sample
+    loader = BDRLoader(sample_path)
+    bdr_info = loader.get_processed_bdr()
+    bdr_content = bdr_info["content"]
+    bdr_name = bdr_info["file_name"]
+
+# 2. Execution Mode (Mock vs Live API)
+st.sidebar.subheader("🧪 2. Çalıştırma Modu")
+exec_mode = st.sidebar.radio(
+    "Mod Seçimi",
+    options=["⚡ Gerçek Canlı API (Bulut / HF)", "🧪 Mock Test Modu (Simülasyon)"],
+    index=0
+)
+is_mock_mode = "Mock" in exec_mode
+
+# 3. Model Selections from config.json
+st.sidebar.subheader("🤖 3. Değerlendirilecek Modeller")
+config_data = Config.load_config()
+all_models = config_data.get("models", [])
+
+selected_model_ids = []
+st.sidebar.caption("Analize Dahil Etmek İstediğiniz Modelleri Seçin:")
+
+for m in all_models:
+    model_id = m.get("id")
+    model_name = m.get("name")
+    default_checked = m.get("enabled", False)
+    
+    if st.sidebar.checkbox(f"{model_name}", value=default_checked, key=f"chk_{model_id}"):
+        selected_model_ids.append(model_id)
+
+if not selected_model_ids:
+    st.sidebar.warning("⚠️ Lütfen en az bir model seçiniz!")
+
+# 4. Advanced Hyperparameters (Expander)
+with st.sidebar.expander("🎛️ Gelişmiş Çıkarım Parametreleri"):
+    override_temp = st.slider("Temperature (Sıcaklık)", 0.0, 1.0, 0.1, 0.05)
+    override_top_p = st.slider("Top-P (Nucleus Sampling)", 0.1, 1.0, 0.9, 0.05)
+    override_rep_penalty = st.slider("Repetition Penalty (Tekrar Cezası)", 1.0, 1.5, 1.05, 0.05)
+
+# Sidebar Action Button (Streamlit 1.62 Compatible)
+try:
+    run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
+except TypeError:
+    run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", width="stretch")
+
+# MAIN BODY TABS
+tab_overview, tab_reports, tab_prompt, tab_input = st.tabs([
+    "📊 Karşılaştırma Paneli", 
+    "🤖 Model Çıktı Raporları", 
+    "📝 Canlı Prompt Düzenleyici", 
+    "📄 BDR Metin Görünümü"
+])
+
+# SESSION STATE STORAGE FOR RESULTS
+if "analysis_results" not in st.session_state:
+    st.session_state.analysis_results = None
+
+# RUN ANALYSIS LOGIC
+if run_analysis_btn and selected_model_ids:
+    with st.spinner("🔄 BDR Metni Analiz Ediliyor ve Model Çıktıları Üretiliyor..."):
+        # Create session directory
+        session_dir, input_stem = ReportWriter.create_session_directory(bdr_name)
+        
+        results_list = []
+        metrics_summary_list = []
+
+        for m_id in selected_model_ids:
+            model_cfg = Config.get_model_by_id(m_id)
+            if not model_cfg:
+                for item in all_models:
+                    if item.get("id") == m_id:
+                        model_cfg = {**config_data, **item}
+                        break
+
+            if is_mock_mode:
+                model_cfg["provider"] = "mock"
+
+            # Apply UI Hyperparameter Overrides
+            model_cfg["temperature"] = override_temp
+            model_cfg["top_p"] = override_top_p
+            model_cfg["repetition_penalty"] = override_rep_penalty
+
+            # Use active edited prompts from session state!
+            analyzer = BDRAnalyzer(
+                model_config=model_cfg,
+                custom_system_prompt=st.session_state.active_system_prompt,
+                custom_user_template=st.session_state.active_user_template
+            )
+            report = analyzer.analyze(bdr_content)
+            md_content = analyzer.format_report_as_markdown(report)
+
+            # Save reports to session folder
+            ReportWriter.save_model_report(session_dir, m_id, report, md_content)
+
+            results_list.append({
+                "model_id": m_id,
+                "model_name": model_cfg.get("name", m_id),
+                "report": report,
+                "md_content": md_content,
+                "config": model_cfg
+            })
+
+            metrics_summary_list.append({
+                "model_id": m_id,
+                "model_name": model_cfg.get("name", m_id),
+                "provider": model_cfg.get("provider"),
+                "duration_sec": report.analiz_suresi_saniye,
+                "is_mock_fallback": report.is_mock_fallback,
+                "fallback_reason": report.fallback_reason,
+                "risk_count": len(report.tespit_edilen_riskler),
+                "karar_egilimi": report.karar_egilimi.value,
+                "denetci_gorusu": report.denetci_gorusu.value if report.denetci_gorusu else None
+            })
+
+        # Save summary metrics report
+        ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
+        st.session_state.analysis_results = results_list
+        st.session_state.metrics_summary = metrics_summary_list
+        st.success(f"✅ Analiz Başarıyla Tamamlandı! Raporlar kaydedildi: `{session_dir}`")
+
+# TAB 1: EXECUTIVE SUMMARY & METRICS COMPARISON
+with tab_overview:
+    st.subheader("📊 Model Karşılaştırma & Metrik Özet Tablosu")
+    
+    if st.session_state.analysis_results:
+        metrics = st.session_state.metrics_summary
+
+        # Top Metric Cards
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("İşlenen Dosya", bdr_name)
+        col2.metric("Çalıştırılan Model Sayısı", len(metrics))
+        avg_latency = sum(m["duration_sec"] for m in metrics) / len(metrics) if metrics else 0.0
+        col3.metric("Ortalama Analiz Süresi", f"{avg_latency:.2f} sn")
+        active_mode = "🧪 Mock Test Modu" if is_mock_mode else "⚡ Canlı API"
+        col4.metric("Çalıştırma Modu", active_mode)
+
+        st.markdown("---")
+
+        # Summary Table View
+        table_data = []
+        for m in metrics:
+            status_badge = "⚠️ Mock Fallback" if m["is_mock_fallback"] else "✅ Gerçek API"
+            table_data.append({
+                "Model ID": m["model_id"],
+                "Model Adı": m["model_name"],
+                "Sağlayıcı": m["provider"],
+                "Analiz Süresi (sn)": f"{m['duration_sec']:.2f}s",
+                "Durum": status_badge,
+                "Risk Kalemi Sayısı": f"{m['risk_count']} Kalem",
+                "Denetçi Görüşü": m["denetci_gorusu"] or "N/A",
+                "Kredi Komitesi Kararı": m["karar_egilimi"]
+            })
+
+        try:
+            st.dataframe(table_data, use_container_width=True)
+        except TypeError:
+            st.dataframe(table_data, width="stretch")
+    else:
+        st.info("👈 Analizi başlatmak için sol menüden modellerinizi seçip **🚀 ANALİZİ BAŞLAT** butonuna tıklayınız.")
+
+# TAB 2: INDIVIDUAL MODEL REPORTS VIEW
+with tab_reports:
+    if st.session_state.analysis_results:
+        st.subheader("🤖 Model Çıktı Raporları")
+        
+        results = st.session_state.analysis_results
+        model_tabs = st.tabs([r["model_name"] for r in results])
+
+        for idx, r in enumerate(results):
+            with model_tabs[idx]:
+                report = r["report"]
+                
+                if report.is_mock_fallback:
+                    st.warning(f"⚠️ **Mock Fallback Uyarısı**: Gerçek API hatası nedeniyle simülasyon raporu gösterilmektedir. (Hata: {report.fallback_reason})")
+
+                # Key Rapor Kartları
+                c1, c2, c3 = st.columns(3)
+                c1.info(f"**Firma:** {report.firma_adi}")
+                c2.success(f"**Denetçi Görüşü:** {report.denetci_gorusu.value if report.denetci_gorusu else 'Belirtilmemiş'}")
+                c3.warning(f"**Karar Eğilimi:** {report.karar_egilimi.value}")
+
+                st.markdown("---")
+                st.markdown(r["md_content"])
+    else:
+        st.info("👈 Henüz bir analiz çalıştırılmadı. Sol menüden **🚀 ANALİZİ BAŞLAT** butonuna tıklayabilirsiniz.")
+
+# TAB 3: DYNAMIC PROMPT EDITOR & INSPECTOR
+with tab_prompt:
+    st.subheader("📝 Canlı Prompt Düzenleme & İnceleme Paneli")
+    st.caption("Aşağıdaki alanlardan System Prompt ve User Prompt metinlerini canlı olarak değiştirebilir ve analizde kullanabilirsiniz:")
+
+    col_btn1, col_btn2, col_spacer = st.columns([1, 1, 2])
+    with col_btn1:
+        if st.button("💾 Değişiklikleri Dosyaya Kaydet (`prompts/bdr_analyst_v1.md`)"):
+            full_prompt_md = f"# BDR Finansal Risk Analist Sistem Promptu (v1 - Dinamik)\n\n## SYSTEM_PROMPT\n{st.session_state.active_system_prompt}\n\n---\n\n## USER_PROMPT\n{st.session_state.active_user_template}\n"
+            target_prompt_file = Config.BASE_DIR / "prompts" / PROMPT_FILE_NAME
+            target_prompt_file.write_text(full_prompt_md, encoding="utf-8")
+            PromptLoader._cache.clear()
+            st.success("✅ Prompt şablonu dosyaya kalıcı olarak kaydedildi!")
+
+    with col_btn2:
+        if st.button("🔄 Orijinal Şablona Sıfırla"):
+            sys_orig, usr_orig = PromptLoader.load_prompt_md(PROMPT_FILE_NAME)
+            st.session_state.active_system_prompt = sys_orig
+            st.session_state.active_user_template = usr_orig
+            st.rerun()
+
+    st.markdown("---")
+
+    col_sys, col_usr = st.columns(2)
+    with col_sys:
+        st.markdown("#### 🟢 SYSTEM_PROMPT (Rol & Talimatlar)")
+        edited_sys = st.text_area(
+            "System Prompt Düzenle", 
+            value=st.session_state.active_system_prompt, 
+            height=500,
+            key="sys_area"
+        )
+        st.session_state.active_system_prompt = edited_sys
+
+    with col_usr:
+        st.markdown("#### 🔵 USER_PROMPT (Girdi Şablonu)")
+        edited_usr = st.text_area(
+            "User Prompt Düzenle ({{bdr_text}} alanını koruyunuz)", 
+            value=st.session_state.active_user_template, 
+            height=500,
+            key="usr_area"
+        )
+        st.session_state.active_user_template = edited_usr
+
+# TAB 4: RAW BDR INPUT TEXT VIEWER
+with tab_input:
+    st.subheader(f"📄 İşlenen BDR Dosya İçeriği: `{bdr_name}`")
+    st.caption(f"Karakter Sayısı: {len(bdr_content)} | Kelime Sayısı: {len(bdr_content.split())}")
+    st.text_area("BDR Ham Metni", bdr_content, height=500)
