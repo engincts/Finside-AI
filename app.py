@@ -31,10 +31,11 @@ if sys.platform == "win32":
 
 import streamlit as st
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 
 MAX_PARALLEL_MODELS = 8
 BDR_PREVIEW_CHARS = 20000
+BENCHMARK_MAX_WAIT_SEC = 600  # bu süreyi aşan modeller "zaman aşımı" olarak işaretlenir
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -80,13 +81,10 @@ def run_model_analysis(
     model_cfg["top_p"] = hyperparams["top_p"]
     model_cfg["repetition_penalty"] = hyperparams["repetition_penalty"]
 
-    # Kıyas modu: büyük BDR'yi chunk'lamak yerine limit kadar kesip tek çağrı yap
-    # (hız için; tam analiz Multi-Agent Pipeline sekmesinde).
     analyzer = BDRAnalyzer(
         model_config=model_cfg,
         custom_system_prompt=system_prompt,
         custom_user_template=user_template,
-        buyuk_girdi_stratejisi="truncate",
     )
     report = analyzer.analyze(bdr_content)
     md_content = analyzer.format_report_as_markdown(report)
@@ -245,33 +243,40 @@ if run_analysis_btn and selected_model_ids:
         active_user_template = st.session_state.active_user_template
 
         outputs = {}
-        with ThreadPoolExecutor(max_workers=min(len(selected_model_ids), MAX_PARALLEL_MODELS)) as executor:
-            futures = {
-                executor.submit(
-                    run_model_analysis,
-                    m_id,
-                    all_models,
-                    config_data,
-                    is_mock_mode,
-                    hyperparams,
-                    active_system_prompt,
-                    active_user_template,
-                    bdr_content,
-                    session_dir,
-                ): m_id
-                for m_id in selected_model_ids
-            }
-            for future in as_completed(futures):
-                outputs[futures[future]] = future.result()
+        executor = ThreadPoolExecutor(max_workers=min(len(selected_model_ids), MAX_PARALLEL_MODELS))
+        futures = {
+            executor.submit(
+                run_model_analysis,
+                m_id, all_models, config_data, is_mock_mode, hyperparams,
+                active_system_prompt, active_user_template, bdr_content, session_dir,
+            ): m_id
+            for m_id in selected_model_ids
+        }
+        done, not_done = futures_wait(futures, timeout=BENCHMARK_MAX_WAIT_SEC)
+        for future in done:
+            outputs[futures[future]] = future.result()
+        zaman_asimi = [futures[f] for f in not_done]
+        for future in not_done:
+            future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
 
-        results_list = [outputs[m_id]["result"] for m_id in selected_model_ids]
-        metrics_summary_list = [outputs[m_id]["metrics"] for m_id in selected_model_ids]
+        if zaman_asimi:
+            st.warning(
+                f"⏱️ {len(zaman_asimi)} model {BENCHMARK_MAX_WAIT_SEC} sn içinde tamamlanamadı ve "
+                f"atlandı: {', '.join(zaman_asimi)}"
+            )
 
-        # Save summary metrics report
-        ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
-        st.session_state.analysis_results = results_list
-        st.session_state.metrics_summary = metrics_summary_list
-        st.success(f"✅ Analiz Başarıyla Tamamlandı! Raporlar kaydedildi: `{session_dir}`")
+        tamamlanan = [m_id for m_id in selected_model_ids if m_id in outputs]
+        results_list = [outputs[m_id]["result"] for m_id in tamamlanan]
+        metrics_summary_list = [outputs[m_id]["metrics"] for m_id in tamamlanan]
+
+        if not results_list:
+            st.error("❌ Hiçbir model zamanında tamamlanamadı. Daha hızlı model seçin veya süreyi artırın.")
+        else:
+            ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
+            st.session_state.analysis_results = results_list
+            st.session_state.metrics_summary = metrics_summary_list
+            st.success(f"✅ Analiz Tamamlandı ({len(results_list)}/{len(selected_model_ids)} model). Raporlar: `{session_dir}`")
 
 # TAB 1: EXECUTIVE SUMMARY & METRICS COMPARISON
 with tab_overview:
