@@ -51,7 +51,39 @@ class BaseProvider(ABC):
         match = re.search(r'(\{[\s\S]*\})', text)
         if match:
             return match.group(1).strip()
-        return text
+        start = text.find("{")
+        return text[start:].strip() if start != -1 else text
+
+    def _repair_json(self, text: str) -> str:
+        """Kesilmiş JSON'u açık parantez/tırnakları kapatarak kurtarmayı dener."""
+        text = text.strip().rstrip(",")
+        stack = []
+        in_str = False
+        esc = False
+        for ch in text:
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+            elif ch == '"':
+                in_str = True
+            elif ch in "{[":
+                stack.append("}" if ch == "{" else "]")
+            elif ch in "}]" and stack:
+                stack.pop()
+        if in_str:
+            text += '"'
+        return text + "".join(reversed(stack))
+
+    def _parse_report(self, raw_text: str) -> BDRRiskAnalysisReport:
+        json_str = self._extract_json(raw_text)
+        try:
+            return BDRRiskAnalysisReport.model_validate_json(json_str)
+        except Exception:
+            return BDRRiskAnalysisReport.model_validate_json(self._repair_json(json_str))
 
     def generate_mock_report(self, user_prompt: str, is_fallback: bool = False, reason: Optional[str] = None) -> BDRRiskAnalysisReport:
         """API hatası veya test modunda kullanılan güvenilir mock simülasyon raporu."""

@@ -1,6 +1,23 @@
 import os
 import sys
+import signal
 from pathlib import Path
+
+# Anında Anlık Kesinti (Instant Ctrl+C Exit) - Event Loop Kilitlenmesi ve Traceback Önleyici
+def force_immediate_exit(signum, frame):
+    try:
+        sys.stdout.write("\n👋 Finside AI kapatıldı.\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+    os._exit(0)
+
+try:
+    signal.signal(signal.SIGINT, force_immediate_exit)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, force_immediate_exit)
+except Exception:
+    pass
 
 os.environ["PYTHONUTF8"] = "1"
 os.environ["PYTHONIOENCODING"] = "utf-8"
@@ -14,6 +31,9 @@ if sys.platform == "win32":
 
 import streamlit as st
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+MAX_PARALLEL_MODELS = 8
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -32,6 +52,61 @@ from config import Config
 from finside.loaders import BDRLoader, PromptLoader
 from finside.analyzer import BDRAnalyzer
 from finside.writers import ReportWriter
+
+
+def run_model_analysis(
+    model_id,
+    all_models,
+    config_data,
+    is_mock_mode,
+    hyperparams,
+    system_prompt,
+    user_template,
+    bdr_content,
+    session_dir,
+):
+    model_cfg = Config.get_model_by_id(model_id)
+    if not model_cfg:
+        for item in all_models:
+            if item.get("id") == model_id:
+                model_cfg = {**config_data, **item}
+                break
+
+    if is_mock_mode:
+        model_cfg["provider"] = "mock"
+
+    model_cfg["temperature"] = hyperparams["temperature"]
+    model_cfg["top_p"] = hyperparams["top_p"]
+    model_cfg["repetition_penalty"] = hyperparams["repetition_penalty"]
+
+    analyzer = BDRAnalyzer(
+        model_config=model_cfg,
+        custom_system_prompt=system_prompt,
+        custom_user_template=user_template,
+    )
+    report = analyzer.analyze(bdr_content)
+    md_content = analyzer.format_report_as_markdown(report)
+    ReportWriter.save_model_report(session_dir, model_id, report, md_content)
+
+    result = {
+        "model_id": model_id,
+        "model_name": model_cfg.get("name", model_id),
+        "report": report,
+        "md_content": md_content,
+        "config": model_cfg,
+    }
+    metrics = {
+        "model_id": model_id,
+        "model_name": model_cfg.get("name", model_id),
+        "provider": model_cfg.get("provider"),
+        "duration_sec": report.analiz_suresi_saniye,
+        "is_mock_fallback": report.is_mock_fallback,
+        "fallback_reason": report.fallback_reason,
+        "risk_count": len(report.tespit_edilen_riskler),
+        "karar_egilimi": report.karar_egilimi.value,
+        "denetci_gorusu": report.denetci_gorusu.value if report.denetci_gorusu else None,
+    }
+    return {"result": result, "metrics": metrics}
 
 
 # Custom Executive UI CSS Styling
@@ -131,9 +206,9 @@ with st.sidebar.expander("🎛️ Gelişmiş Çıkarım Parametreleri"):
 
 # Sidebar Action Button (Streamlit 1.62 Compatible)
 try:
-    run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
-except TypeError:
     run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", width="stretch")
+except TypeError:
+    run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
 
 # MAIN BODY TABS
 tab_overview, tab_reports, tab_prompt, tab_input = st.tabs([
@@ -152,57 +227,37 @@ if run_analysis_btn and selected_model_ids:
     with st.spinner("🔄 BDR Metni Analiz Ediliyor ve Model Çıktıları Üretiliyor..."):
         # Create session directory
         session_dir, input_stem = ReportWriter.create_session_directory(bdr_name)
-        
-        results_list = []
-        metrics_summary_list = []
 
-        for m_id in selected_model_ids:
-            model_cfg = Config.get_model_by_id(m_id)
-            if not model_cfg:
-                for item in all_models:
-                    if item.get("id") == m_id:
-                        model_cfg = {**config_data, **item}
-                        break
+        hyperparams = {
+            "temperature": override_temp,
+            "top_p": override_top_p,
+            "repetition_penalty": override_rep_penalty,
+        }
+        active_system_prompt = st.session_state.active_system_prompt
+        active_user_template = st.session_state.active_user_template
 
-            if is_mock_mode:
-                model_cfg["provider"] = "mock"
+        outputs = {}
+        with ThreadPoolExecutor(max_workers=min(len(selected_model_ids), MAX_PARALLEL_MODELS)) as executor:
+            futures = {
+                executor.submit(
+                    run_model_analysis,
+                    m_id,
+                    all_models,
+                    config_data,
+                    is_mock_mode,
+                    hyperparams,
+                    active_system_prompt,
+                    active_user_template,
+                    bdr_content,
+                    session_dir,
+                ): m_id
+                for m_id in selected_model_ids
+            }
+            for future in as_completed(futures):
+                outputs[futures[future]] = future.result()
 
-            # Apply UI Hyperparameter Overrides
-            model_cfg["temperature"] = override_temp
-            model_cfg["top_p"] = override_top_p
-            model_cfg["repetition_penalty"] = override_rep_penalty
-
-            # Use active edited prompts from session state!
-            analyzer = BDRAnalyzer(
-                model_config=model_cfg,
-                custom_system_prompt=st.session_state.active_system_prompt,
-                custom_user_template=st.session_state.active_user_template
-            )
-            report = analyzer.analyze(bdr_content)
-            md_content = analyzer.format_report_as_markdown(report)
-
-            # Save reports to session folder
-            ReportWriter.save_model_report(session_dir, m_id, report, md_content)
-
-            results_list.append({
-                "model_id": m_id,
-                "model_name": model_cfg.get("name", m_id),
-                "report": report,
-                "md_content": md_content,
-                "config": model_cfg
-            })
-
-            metrics_summary_list.append({
-                "model_id": m_id,
-                "model_name": model_cfg.get("name", m_id),
-                "provider": model_cfg.get("provider"),
-                "duration_sec": report.analiz_suresi_saniye,
-                "is_mock_fallback": report.is_mock_fallback,
-                "fallback_reason": report.fallback_reason,
-                "risk_count": len(report.tespit_edilen_riskler),
-                "karar_egilimi": report.karar_egilimi.value,
-                "denetci_gorusu": report.denetci_gorusu.value if report.denetci_gorusu else None
-            })
+        results_list = [outputs[m_id]["result"] for m_id in selected_model_ids]
+        metrics_summary_list = [outputs[m_id]["metrics"] for m_id in selected_model_ids]
 
         # Save summary metrics report
         ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
@@ -244,9 +299,9 @@ with tab_overview:
             })
 
         try:
-            st.dataframe(table_data, use_container_width=True)
-        except TypeError:
             st.dataframe(table_data, width="stretch")
+        except TypeError:
+            st.dataframe(table_data, use_container_width=True)
     else:
         st.info("👈 Analizi başlatmak için sol menüden modellerinizi seçip **🚀 ANALİZİ BAŞLAT** butonuna tıklayınız.")
 

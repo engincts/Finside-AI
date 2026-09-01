@@ -50,8 +50,7 @@ class GeminiProvider(BaseProvider):
                 )
 
             raw_text = response.text if hasattr(response, "text") and response.text else "{}"
-            json_str = self._extract_json(raw_text)
-            report = BDRRiskAnalysisReport.model_validate_json(json_str)
+            report = self._parse_report(raw_text)
             report.is_mock_fallback = False
             return report
         except Exception as e:

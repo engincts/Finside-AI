@@ -35,10 +35,10 @@
       "enabled": false
     },
     {
-      "id": "gpt-4o",
-      "name": "OpenAI GPT-4o (Amiral Gemisi)",
+      "id": "gpt-4o-mini",
+      "name": "OpenAI GPT-4o-mini (Hızlı & 200K TPM Yüksek Kapasite)",
       "provider": "openai",
-      "model_name": "gpt-4o",
+      "model_name": "gpt-4o-mini",
       "api_key_env": "OPENAI_API_KEY",
       "reasoning_effort": "high",
       "max_tokens": 8192,
@@ -48,10 +48,10 @@
       "enabled": false
     },
     {
-      "id": "gpt-4o-mini",
-      "name": "OpenAI GPT-4o-mini (Hızlı & 200K TPM Yüksek Kapasite)",
+      "id": "gpt-4o",
+      "name": "OpenAI GPT-4o (Amiral Gemisi)",
       "provider": "openai",
-      "model_name": "gpt-4o-mini",
+      "model_name": "gpt-4o",
       "api_key_env": "OPENAI_API_KEY",
       "reasoning_effort": "high",
       "max_tokens": 8192,
@@ -72,13 +72,13 @@
       "enabled": false
     },
     {
-      "id": "claude-3-5-sonnet",
-      "name": "Anthropic Claude 3.5 Sonnet",
+      "id": "claude-sonnet-4-5",
+      "name": "Anthropic Claude Sonnet 4.5",
       "provider": "anthropic",
-      "model_name": "claude-3-5-sonnet-20241022",
+      "model_name": "claude-sonnet-4-5",
       "api_key_env": "ANTHROPIC_API_KEY",
       "reasoning_effort": "high",
-      "max_tokens": 8192,
+      "max_tokens": 32000,
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",

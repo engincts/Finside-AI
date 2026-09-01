@@ -47,7 +47,7 @@ class HuggingFaceProvider(BaseProvider):
 
                 # 1. Deneme: Chat Completion API (Task: conversational)
                 try:
-                    response_chat = client.chat.completions.create(
+                    stream = client.chat.completions.create(
                         messages=[
                             {"role": "system", "content": strict_system_prompt},
                             {"role": "user", "content": user_prompt}
@@ -55,8 +55,13 @@ class HuggingFaceProvider(BaseProvider):
                         max_tokens=self.max_tokens,
                         temperature=self.temperature,
                         top_p=self.top_p,
+                        stream=True,
                     )
-                    raw_text = response_chat.choices[0].message.content
+                    raw_text = "".join(
+                        (part.choices[0].delta.content or "")
+                        for part in stream
+                        if part.choices
+                    )
                 except Exception as chat_err:
                     chat_err_str = str(chat_err).lower()
                     # Eğer "not a chat model" veya "not supported" ise text_generation dene veya sonraki modele geç
@@ -75,8 +80,7 @@ class HuggingFaceProvider(BaseProvider):
                         raise chat_err
 
                 if raw_text:
-                    json_str = self._extract_json(raw_text)
-                    report = BDRRiskAnalysisReport.model_validate_json(json_str)
+                    report = self._parse_report(raw_text)
                     report.is_mock_fallback = False
                     
                     # Eğer fallback model kullanıldıysa kullanıcıyı şeffaf bilgilendir

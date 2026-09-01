@@ -73,6 +73,7 @@ class BDRRiskItem(BaseModel):
                 return RiskKategorisi.DENETCI_GORUSU_VE_KAM.value
             if "koşullu" in v_clean or "taahhüt" in v_clean:
                 return RiskKategorisi.KOSULLU_YUKUMLULUK.value
+            return RiskKategorisi.DIGER_KALITATIF_RISK.value
         return v
 
     @field_validator("risk_derecesi", mode="before")
@@ -88,6 +89,7 @@ class BDRRiskItem(BaseModel):
                 return RiskDerecesi.ORTA.value
             if "düşük" in v_clean or "dusuk" in v_clean or "low" in v_clean:
                 return RiskDerecesi.DUSUK.value
+            return RiskDerecesi.ORTA.value
         return v
 
 
@@ -134,7 +136,7 @@ class BDRRiskAnalysisReport(BaseModel):
             v_clean = v.strip().lower()
             if "şartlı" in v_clean or "sartli" in v_clean or "covenant" in v_clean:
                 return KomiteKararEgilimi.SARTLI_OLUMLU.value
-            if "olumsuz" in v_clean or "red" in v_clean:
+            if "olumsuz" in v_clean or "reddedil" in v_clean or "rejected" in v_clean:
                 return KomiteKararEgilimi.OLUMSUZ.value
             if "olumlu" in v_clean:
                 return KomiteKararEgilimi.OLUMLU.value

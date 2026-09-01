@@ -1,10 +1,44 @@
+import os
 import time
-from typing import Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, List, Optional
 
 from config import Config
+from finside.chunking import build_chunks
+from finside.dedupe import uncovered_risks
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
-from prompts.schemas import BDRRiskAnalysisReport, RiskDerecesi
+from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem, RiskDerecesi
+
+EMBED_API_KEY_ENV = "OPENAI_API_KEY"
+
+DEFAULT_MAX_INPUT_CHARS = 150_000
+PROVIDER_INPUT_LIMITS = {
+    "huggingface": 90_000,
+    "openai": 200_000,
+    "anthropic": 200_000,
+    "gemini": 200_000,
+    "mock": 5_000_000,
+}
+CHUNK_UTILIZATION = 0.9
+MAX_CHUNK_WORKERS = 4
+
+CHUNK_INSTRUCTION = (
+    "[BDR PARÇA {idx}/{total}] Aşağıdaki metin, daha büyük bir Bağımsız Denetim Raporunun "
+    "yalnızca bir bölümüdür. SADECE bu bölümde açıkça yer alan kalitatif kredi risklerini çıkar. "
+    "Bu bölümde risk yoksa 'tespit_edilen_riskler' listesini boş bırak. Firma, dönem ve denetçi "
+    "bilgisini metnin künye kısmından doldur.\n\n{body}"
+)
+
+SYNTHESIS_INSTRUCTION = (
+    "[SENTEZ GÖREVİ] Aşağıda AYNI Bağımsız Denetim Raporunun farklı bölümlerinden çıkarılmış "
+    "kısmi risk analizleri (JSON) yer alıyor. Bunları tek, tutarlı ve tekrarsız bir kredi "
+    "komitesi raporunda birleştir. Genel kredi risk özetini, karar eğilimini ve analist gerekçe "
+    "metnini tüm riskleri birlikte değerlendirerek yeniden yaz; borç ödeme kapasitesi, likidite "
+    "ve teminat yapısı açısından derin bir analist yorumu üret.\n\n{body}"
+)
+
+_SYNTH_EXCLUDE = {"analiz_suresi_saniye", "kullanilan_model", "is_mock_fallback", "fallback_reason"}
 
 
 class BDRAnalyzer:
@@ -31,6 +65,10 @@ class BDRAnalyzer:
         self.model_name = self.model_config.get("model_name", "mock")
         self.prompt_file = self.model_config.get("prompt_file", "bdr_analyst_v1.md")
         self.api_key = Config.get_api_key_for_model(self.model_config)
+        self.max_input_chars = int(
+            self.model_config.get("max_input_chars")
+            or PROVIDER_INPUT_LIMITS.get(self.provider_name, DEFAULT_MAX_INPUT_CHARS)
+        )
 
         # Markdown Prompt Yükleyici (PromptLoader) veya Dinamik Prompt Overrides
         default_sys, default_usr = PromptLoader.load_prompt_md(self.prompt_file)
@@ -46,16 +84,82 @@ class BDRAnalyzer:
         )
 
     def analyze(self, bdr_text: str) -> BDRRiskAnalysisReport:
-        user_prompt = self.user_template.format(bdr_text=bdr_text)
         start_time = time.perf_counter()
 
-        # Strategy Pattern: Sağlayıcıya dinamik prompt ile delegasyon
-        report = self.provider.analyze(user_prompt)
+        if len(bdr_text) <= self.max_input_chars:
+            report = self._run_provider(bdr_text)
+            report.kullanilan_model = self.model_config.get("name", self.model_name)
+        else:
+            report = self._analyze_chunked(bdr_text)
 
-        elapsed = round(time.perf_counter() - start_time, 3)
-        report.analiz_suresi_saniye = elapsed
-        report.kullanilan_model = self.model_config.get("name", self.model_name)
+        report.analiz_suresi_saniye = round(time.perf_counter() - start_time, 3)
         return report
+
+    def _run_provider(self, bdr_text: str) -> BDRRiskAnalysisReport:
+        # Strategy Pattern: Sağlayıcıya dinamik prompt ile delegasyon
+        return self.provider.analyze(self.user_template.format(bdr_text=bdr_text))
+
+    def _analyze_chunked(self, bdr_text: str) -> BDRRiskAnalysisReport:
+        chunks = build_chunks(bdr_text, int(self.max_input_chars * CHUNK_UTILIZATION))
+        total = len(chunks)
+        tasks = [
+            CHUNK_INSTRUCTION.format(idx=i + 1, total=total, body=chunk)
+            for i, chunk in enumerate(chunks)
+        ]
+        with ThreadPoolExecutor(max_workers=min(total, MAX_CHUNK_WORKERS)) as executor:
+            partials = list(executor.map(self._run_provider, tasks))
+
+        valid = [p for p in partials if not p.is_mock_fallback]
+        if not valid:
+            return partials[0]
+
+        merged_risks = self._dedupe_risks(
+            [risk for p in valid for risk in p.tespit_edilen_riskler]
+        )
+        merged_terms = list(dict.fromkeys(
+            term for p in valid for term in p.komite_tavsiyesi_ve_sartlar
+        ))
+
+        report = self._synthesize(valid, merged_risks, merged_terms)
+        report.is_mock_fallback = False
+        report.fallback_reason = None
+        report.kullanilan_model = f"{self.model_config.get('name', self.model_name)} (Yapısal Chunk: {total} bölüm)"
+        return report
+
+    def _synthesize(
+        self,
+        partials: List[BDRRiskAnalysisReport],
+        merged_risks: List[BDRRiskItem],
+        merged_terms: List[str],
+    ) -> BDRRiskAnalysisReport:
+        combined = "\n\n".join(
+            p.model_dump_json(exclude=_SYNTH_EXCLUDE, exclude_none=True) for p in partials
+        )
+        try:
+            synth = self._run_provider(SYNTHESIS_INSTRUCTION.format(body=combined))
+            if not synth.is_mock_fallback:
+                consolidated = synth.tespit_edilen_riskler
+                recovered = uncovered_risks(
+                    merged_risks, consolidated, api_key=os.getenv(EMBED_API_KEY_ENV)
+                )
+                synth.tespit_edilen_riskler = consolidated + recovered
+                synth.komite_tavsiyesi_ve_sartlar = synth.komite_tavsiyesi_ve_sartlar or merged_terms
+                return synth
+        except Exception:
+            pass
+
+        base = partials[0]
+        base.tespit_edilen_riskler = merged_risks
+        base.komite_tavsiyesi_ve_sartlar = merged_terms or base.komite_tavsiyesi_ve_sartlar
+        return base
+
+    @staticmethod
+    def _dedupe_risks(risks: List[BDRRiskItem]) -> List[BDRRiskItem]:
+        seen: Dict[str, BDRRiskItem] = {}
+        for risk in risks:
+            key = risk.baslik.strip().lower()
+            seen.setdefault(key, risk)
+        return list(seen.values())
 
     def format_report_as_markdown(self, report: BDRRiskAnalysisReport) -> str:
         lines = [
