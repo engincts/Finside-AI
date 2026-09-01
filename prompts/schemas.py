@@ -33,7 +33,10 @@ class DenetciGorusTuru(str, Enum):
 
 class BDRRiskItem(BaseModel):
     risk_kategorisi: RiskKategorisi = Field(..., description="Risk kaleminin dahil olduğu ana TFRS/BDR kategorisi.")
-    dipnot_referansi: Optional[str] = Field(None, description="Riskin ait olduğu BDR dipnot numarası ve başlığı.")
+    dipnot_referansi: Optional[str] = Field(
+        None, 
+        description="Riskin ait olduğu BDR dipnot numarası ve başlığı (örn: 'Dipnot 21 - Taahhütler'). Şirketten şirkete ve denetim firmasından denetim firmasına dipnot numaraları değişebileceğinden metindeki özgün referansı yazınız."
+    )
     baslik: str = Field(..., description="Risk kaleminin kısa ve net başlığı.")
     detay: str = Field(..., description="BDR dipnotundaki riskin özeti ve ayrıntıları.")
     tutar_bilgisi: Optional[str] = Field(None, description="Riskin TL, USD veya EUR cinsinden tutarı.")
@@ -49,21 +52,28 @@ class BDRRiskItem(BaseModel):
             for cat in RiskKategorisi:
                 if cat.value.lower() in v_clean or v_clean in cat.value.lower():
                     return cat.value
-                # Anahtar kelime eşleştirme
-                if "kefalet" in v_clean or "garanti" in v_clean:
-                    return RiskKategorisi.KEFALET_TEMINAT.value
-                if "dava" in v_clean or "ihtilaf" in v_clean:
-                    return RiskKategorisi.DAVA.value
-                if "tri" in v_clean or "ipotek" in v_clean or "rehin" in v_clean:
-                    return RiskKategorisi.REHIN_IPOTEK_TRI.value
-                if "döviz" in v_clean or "kur" in v_clean or "yabancı para" in v_clean:
-                    return RiskKategorisi.KUR_VE_DOVIZ_RISKI.value
-                if "vergi" in v_clean or "tarhiyat" in v_clean:
-                    return RiskKategorisi.MEVZUAT_VERGI.value
-                if "ilişkili" in v_clean:
-                    return RiskKategorisi.ILISKILI_TARAF.value
-                if "likidite" in v_clean or "akreditif" in v_clean or "borç" in v_clean:
-                    return RiskKategorisi.LIKIDITE_VE_BORCLANMA.value
+            
+            if "faaliyet" in v_clean or "süreklilik" in v_clean or "sonraki" in v_clean or "bilanço" in v_clean:
+                return RiskKategorisi.FAALIYET_SUREKLILIGI_VE_SONRAKI_OLAYLAR.value
+            if "kefalet" in v_clean or "garanti" in v_clean:
+                return RiskKategorisi.KEFALET_TEMINAT.value
+            if "dava" in v_clean or "ihtilaf" in v_clean:
+                return RiskKategorisi.DAVA.value
+            if "tri" in v_clean or "ipotek" in v_clean or "rehin" in v_clean:
+                return RiskKategorisi.REHIN_IPOTEK_TRI.value
+            if "döviz" in v_clean or "kur" in v_clean or "yabancı para" in v_clean:
+                return RiskKategorisi.KUR_VE_DOVIZ_RISKI.value
+            if "vergi" in v_clean or "tarhiyat" in v_clean:
+                return RiskKategorisi.MEVZUAT_VERGI.value
+            if "ilişkili" in v_clean:
+                return RiskKategorisi.ILISKILI_TARAF.value
+            if "likidite" in v_clean or "akreditif" in v_clean or "borç" in v_clean:
+                return RiskKategorisi.LIKIDITE_VE_BORCLANMA.value
+            if "denetçi" in v_clean or "görüş" in v_clean or "kam" in v_clean or "kilit" in v_clean:
+                return RiskKategorisi.DENETCI_GORUSU_VE_KAM.value
+            if "koşullu" in v_clean or "taahhüt" in v_clean:
+                return RiskKategorisi.KOSULLU_YUKUMLULUK.value
+            return RiskKategorisi.DIGER_KALITATIF_RISK.value
         return v
 
     @field_validator("risk_derecesi", mode="before")
@@ -79,6 +89,7 @@ class BDRRiskItem(BaseModel):
                 return RiskDerecesi.ORTA.value
             if "düşük" in v_clean or "dusuk" in v_clean or "low" in v_clean:
                 return RiskDerecesi.DUSUK.value
+            return RiskDerecesi.ORTA.value
         return v
 
 
@@ -91,6 +102,8 @@ class KomiteKararEgilimi(str, Enum):
 class BDRRiskAnalysisReport(BaseModel):
     kullanilan_model: Optional[str] = Field(None, description="Analizi gerçekleştiren LLM modeli.")
     analiz_suresi_saniye: Optional[float] = Field(None, description="Analiz süresi (saniye).")
+    is_mock_fallback: bool = Field(False, description="API çağrısı başarısız olduğu için mock fallback üretilip üretilmediği şeffaflık bayrağı.")
+    fallback_reason: Optional[str] = Field(None, description="Mock fallback tetiklenme nedeni/hata mesajı.")
     firma_adi: Optional[str] = Field("Belirtilmemiş Şirket", description="BDR raporunun ait olduğu firma adı.")
     rapor_donemi: Optional[str] = Field("Belirtilmemiş Dönem", description="BDR raporlama dönemi.")
     denetim_firmasi: Optional[str] = Field(None, description="Bağımsız Denetim Kuruluşu (EY, PwC, Deloitte, KPMG vb.).")
@@ -123,7 +136,7 @@ class BDRRiskAnalysisReport(BaseModel):
             v_clean = v.strip().lower()
             if "şartlı" in v_clean or "sartli" in v_clean or "covenant" in v_clean:
                 return KomiteKararEgilimi.SARTLI_OLUMLU.value
-            if "olumsuz" in v_clean or "red" in v_clean:
+            if "olumsuz" in v_clean or "reddedil" in v_clean or "rejected" in v_clean:
                 return KomiteKararEgilimi.OLUMSUZ.value
             if "olumlu" in v_clean:
                 return KomiteKararEgilimi.OLUMLU.value
