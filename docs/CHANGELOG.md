@@ -4,6 +4,35 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — İlk gerçek uçtan uca pipeline testi + 3 bug fix
+
+**Konfig:** `map_models=["gpt-oss-120b"]`, `reconciler/critic/synthesis/segmenter_fallback
+= gemini-3.6-flash`, `triage = gpt-4o-mini` (ucuz senaryo, `docs/ARCHITECTURE.md` §0'daki
+tahmine yakın). Borusan BDR'si (593K karakter), gerçek API.
+
+**Sonuç:** 372 sn, 19 LLM çağrısı, 1 başarısız (Gemini free-tier 429), $0.0315,
+10 risk, `qa_bayraklari: []`. Fonksiyonel olarak uçtan uca çalıştı.
+
+**Bulunan ve düzeltilen 3 bug** (bkz. commit `aabdbb4`):
+
+1. **Künye kaybı** — segment grupları firma/dönem/denetçi bilgisini taşımıyordu,
+   çoğu grup şema varsayımı ("Belirtilmemiş Şirket") döndürüyordu ve bu değer oy
+   çoğunluğuna karışıyordu → nihai raporda firma adı boş çıktı. `gruplari_olustur`
+   artık her gruba BDR'nin ilk 1200 karakterini (künye) ekliyor; `synthesis.py` ayrıca
+   şema varsayılanlarını oy sayımından hariç tutuyor.
+2. **`kaynak_modeller` halüsinasyonu** — bu izlenebilirlik alanı LLM'in serbestçe
+   dolduracağı bir şema alanıydı; gemini "claude-3-5-sonnet", "audit-agent-v1",
+   "audit_model" gibi **hiç var olmayan model adları** üretti. `reconciler.py` /
+   `critic.py` artık bu alanı LLM'den hiç almıyor, deterministik atıyor.
+3. **Gemini 429** tek denemede mock fallback'e düşürüyordu → `GeminiProvider`'a
+   429'a özel 1 tekrar + 8 sn bekleme eklendi.
+
+**Ders:** free-tier Gemini kotası (dk başına 5 istek) reconciler+critic+synthesis+
+segmenter_fallback'in hepsini aynı modele yüklemek için yetersiz; gerçek/daha büyük
+koşumlarda ücretli tier veya rolleri farklı sağlayıcılara dağıtmak gerekir.
+
+---
+
 ## 2026-09-01 — Model fiyatları (`config.json`)
 
 - Tüm 20 modele `usd_1k_in` / `usd_1k_out` (1K token başına USD) eklendi. Artık
