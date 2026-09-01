@@ -186,7 +186,10 @@ config_data = Config.load_config()
 all_models = config_data.get("models", [])
 
 selected_model_ids = []
-st.sidebar.caption("Analize Dahil Etmek İstediğiniz Modelleri Seçin:")
+st.sidebar.caption(
+    "Bu ayarlar (mod, model, parametreler) yalnızca **📊 Karşılaştırma Paneli** "
+    "tek-model kıyaslaması içindir. 🔗 Multi-Agent Pipeline sekmesi bağımsız çalışır."
+)
 
 for m in all_models:
     model_id = m.get("id")
@@ -425,6 +428,12 @@ with tab_pipeline:
         "Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA. "
         "Tasarım: `docs/PIPELINE_DESIGN.md`"
     )
+    st.warning(
+        "Bu sekme **Karşılaştırma Paneli'nden tamamen bağımsızdır** — soldaki mod / model / "
+        "parametre ayarları burada geçerli değildir. Pipeline BDR başına **20-45 LLM çağrısı** "
+        "(~500K-900K token) yapar. Önce Karşılaştırma Paneli'nde modelleri kıyaslayıp en iyi "
+        "2-3'ünü aşağıya ensemble olarak seçin, sonra çalıştırın."
+    )
 
     pipeline_cfg = config_data.get("pipeline", {})
     model_secenekleri = [m.get("id") for m in all_models]
@@ -434,11 +443,16 @@ with tab_pipeline:
         options=model_secenekleri,
         default=varsayilan_ensemble or model_secenekleri[:1],
     )
+    maliyet_onay = st.checkbox("Yüksek token maliyetini anladım, pipeline'ı çalıştır")
 
     try:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch")
+        pipeline_btn = st.button(
+            "🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not maliyet_onay
+        )
     except TypeError:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True)
+        pipeline_btn = st.button(
+            "🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not maliyet_onay
+        )
 
     if pipeline_btn and not secili_ensemble:
         st.warning("⚠️ En az bir ensemble modeli seçiniz.")
