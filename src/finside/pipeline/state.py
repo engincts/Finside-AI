@@ -82,12 +82,22 @@ class PipelineState(TypedDict, total=False):
 
 
 class GrupState(TypedDict, total=False):
-    """group_graph alt-grafının state'i (Faz 4-6). Ana state'ten Send ile beslenir."""
+    """group_graph alt-grafının state'i (Faz 4-6). Ana state'ten Send ile beslenir.
 
+    `uzlastirilmis_riskler` / `celiskiler` / `critic_turlari` / `trace` isimleri ve
+    reducer'ları `PipelineState` ile aynıdır; alt-graf bitince ana state'e taşınır.
+    """
+
+    # Send ile gelen
     grup_id: int
     birlesik_metin: str
     ham_riskler: List[dict]
+    # çalışma
     taslak_riskler: List[dict]
-    celiskiler: List[dict]
     critic_tur: int
+    son_critic_eklenen: int
+    # ana state'e taşınan (operator.add)
+    uzlastirilmis_riskler: Annotated[List[dict], operator.add]
+    celiskiler: Annotated[List[dict], operator.add]
+    critic_turlari: Annotated[List[dict], operator.add]
     trace: Annotated[List[TraceKaydi], operator.add]

@@ -79,6 +79,32 @@ Doğrulama (mock): 8 grup × 1 model = 8 map çıktısı, 24 ham risk; 8 grup ×
 geçersiz id) = 16 çıktı, 8 başarılı + 8 izole hata, graph tamamlandı; checkpoint
 serileştirme uyarısız.
 
+### Faz 4-6 — Grounding + Uzlaştırma + Critic (grup alt-grafı)
+
+- **`pipeline/grounding.py`** (yeni, LLM'siz): `ground_riskler` — her riskin
+  `kaynak_metin_alintisi`'ni `rapidfuzz.partial_ratio` ile ham metinde arar;
+  eşik altı → `dogrulanmadi=True` (katı modda eler).
+- **`pipeline/reconciler.py`** (yeni): `mekanik_birlestir` (başlık kümeleme, en ihtiyatlı
+  `risk_derecesi`, `kaynak_modeller` birleşimi, çelişki notu) + `uzlastir` (Reconciler
+  LLM çağrısı; LLM'in düşürdüğü kalemler recall için geri eklenir, `kaynak_modeller`
+  başlık eşleşmesiyle korunur).
+- **`pipeline/critic.py`** (yeni): `eksik_tara` — taslakta olmayan ham risk başlıkları
+  critic'e ipucu; Critic LLM yalnızca yeni/eksik riskleri döndürür.
+- **`pipeline/group_graph.py`** (yeni): `ground → reconcile ⇄ critic → grup_bitir` alt-grafı.
+  `_route_critic`: `son_critic_eklenen > 0 and critic_tur < max_critic_turu` → `reconcile`.
+  Çıktı ana `PipelineState`'e (`uzlastirilmis_riskler` / `celiskiler` / `critic_turlari`
+  / `trace`, hepsi `operator.add`) taşınır.
+- **`pipeline/nodes/group.py`** (yeni): `grup_dagit` — `map_topla` sonrası her grup için
+  `Send("grup_isle", …)`.
+- **`state.py`:** `GrupState` genişletildi (çalışma + ana state'e taşınan alanlar).
+- **`graph.py`:** `… map_topla ─(Send: grup)→ grup_isle (alt-graf) → END`.
+- **`prompts/`:** `reconciler_v1.md`, `critic_v1.md`.
+
+Doğrulama (mock, tam pipeline): 8 grup → 32 uzlaştırılmış risk, critic turu=1
+(döngü tetiklenmedi — mock critic yeni risk üretmiyor), 66 trace kaydı, uyarısız.
+**Critic döngü birim testi:** sahte critic her turda yeni risk döndürüyor →
+`max_critic_turu=2`'de durdu (2 reconcile + 2 critic).
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B
