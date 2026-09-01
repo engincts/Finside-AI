@@ -34,6 +34,13 @@ class BaseProvider(ABC):
         """Kullanıcı promptunu alır ve BDRRiskAnalysisReport Pydantic nesnesini döndürür."""
         pass
 
+    def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
+        """Şemasız ham metin üretimi (triyaj, segmenter gibi pipeline rolleri için).
+
+        `json_mode=True` yalnızca 'geçerli JSON döndür' ipucu/kip verir, Pydantic şema
+        zorlamaz. Hata durumunda exception atar (çağıran trace'e yazar)."""
+        raise NotImplementedError(f"{type(self).__name__} raw_generate desteklemiyor.")
+
     def _extract_json(self, text: str) -> str:
         """Metin içindeki en dıştaki geçerli JSON objesini ({ ... }) temizler ve çıkarır."""
         if not text:

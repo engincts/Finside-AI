@@ -433,13 +433,12 @@ Batch ×50 BDR → **25-45M token**. → Geliştirme `MockProvider` ile; gerçek
 
 ## 12. Uygulama Sırası
 
-| Adım | Fazlar | Çıktı |
-|---|---|---|
-| 1 | Faz 0 | LangGraph + trace + `llm_call.py` + şema eklemeleri |
-| 2 | Faz 1-2 | `bdr_segmenter.py`, triage node, `segments.json` / `triage_log.json` |
-| 3 | Faz 3 | `map_extract.py` + `Send` fan-out + `MockProvider` E2E |
-| 4 | Faz 4-6 | `grounding.py`, `reconciler.py`, `critic.py` + critic döngüsü |
-| 5 | Faz 7-8 | `synthesis.py`, `qa_rules.py` + `synthesis_v1.md` |
-| 6 | Faz 9-10 | `batch.py`, `run_poc.py --batch`, portföy özeti, maliyet |
-| 7 | Faz 9.5-9.6 | few-shot bankası, UI akış paneli |
-```
+| Adım | Fazlar | Çıktı | Durum |
+|---|---|---|---|
+| 1 | Faz 0 | LangGraph + trace + `llm_call.py` + şema eklemeleri | ✅ |
+| 2 | Faz 1-2 | `bdr_segmenter.py`, triage node, `segments.json` / `triage_log.json`, `graph.py` | ✅ |
+| 3 | Faz 3 | `map_extract.py` + `Send` fan-out + `MockProvider` E2E | — |
+| 4 | Faz 4-6 | `grounding.py`, `reconciler.py`, `critic.py` + critic döngüsü | — |
+| 5 | Faz 7-8 | `synthesis.py`, `qa_rules.py` + `synthesis_v1.md` | — |
+| 6 | Faz 9-10 | `batch.py`, `run_poc.py --batch`, portföy özeti, maliyet | — |
+| 7 | Faz 9.5-9.6 | few-shot bankası, UI akış paneli | — |

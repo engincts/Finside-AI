@@ -29,6 +29,13 @@ class ReportWriter:
         json_file.write_text(report.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
+    def save_json(cls, session_dir: Path, dosya_adi: str, veri: Any):
+        """Pipeline ara çıktılarını (segments.json, triage_log.json) kaydeder."""
+        (session_dir / dosya_adi).write_text(
+            json.dumps(veri, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    @classmethod
     def append_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
         """Pipeline LLM çağrı izlerini satır satır `trace.jsonl`'e ekler (append)."""
         if not kayitlar:

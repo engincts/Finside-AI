@@ -4,6 +4,9 @@ from typing import List
 _HEADING_REGEXES = [
     re.compile(r"^\s*(?:NOT|D[İI]PNOT)\s*[-–—:.]?\s*\d+[A-Za-z]?[.)]?\s+\S", re.IGNORECASE),
     re.compile(r"^\s*\d{1,2}[.)]\s+[0-9A-ZÇĞİÖŞÜ][^\n]{2,120}$"),
+    re.compile(r"^\s*\d{1,2}\.[a-zçğıöşü][.)]\s+\S", re.IGNORECASE),          # alt-dipnot: 21.a)
+    re.compile(r"^\s*[IVXLC]{1,5}[.)]\s+[A-ZÇĞİÖŞÜ][^\n]{2,120}$"),           # Romen rakamı: III. GÖRÜŞ
+    re.compile(r"^\s*EK[- ]?\d+\b.*$", re.IGNORECASE),                        # Ek 1 / EK-2
     re.compile(r"^\s*[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9 .,\-/()&’'\"]{16,}$"),
     re.compile(
         r"^\s*(?:KİLİT DENETİM KONULARI|BAĞIMSIZ DENETÇİ|GÖRÜŞÜN DAYANAĞI|"
@@ -13,10 +16,18 @@ _HEADING_REGEXES = [
 ]
 
 
+_NUMARALI_DIPNOT = _HEADING_REGEXES[0]
+_FINANSAL_SATIR = re.compile(r"\d[.,]\d{3}|\d{4,}")
+
+
 def _is_heading(line: str) -> bool:
     stripped = line.strip()
     if len(stripped) < 4 or len(stripped) > 160:
         return False
+    # Kolonlu/sayısal tablo satırı (bilanço kalemi vb.) başlık sayılmaz;
+    # yalnızca net "NOT 21 ..." biçimli dipnot başlıkları bu durumda geçebilir.
+    if _FINANSAL_SATIR.search(stripped) or stripped.count("  ") >= 2:
+        return bool(_NUMARALI_DIPNOT.match(line))
     return any(rx.match(line) for rx in _HEADING_REGEXES)
 
 

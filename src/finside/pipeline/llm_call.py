@@ -15,6 +15,12 @@ class RaporCagriSonucu:
     trace: TraceKaydi
 
 
+@dataclass
+class HamCagriSonucu:
+    text: str
+    trace: TraceKaydi
+
+
 def _trace(
     asama: str,
     model_id: Optional[str],
@@ -79,3 +85,38 @@ def rapor_cagrisi(
         hata=report.fallback_reason,
     )
     return RaporCagriSonucu(report=report, trace=trace)
+
+
+def ham_cagri(
+    model_id: str,
+    user_prompt: str,
+    *,
+    asama: str,
+    system_prompt: str,
+    json_mode: bool = False,
+) -> HamCagriSonucu:
+    """Şemasız ham metin üreten çağrı (triyaj, segmenter). Hata → trace.basari=False, text=''."""
+    model_cfg = Config.get_model_config_by_id(model_id)
+    if model_cfg is None:
+        raise ValueError(f"Bilinmeyen model id: {model_id}")
+
+    provider_name = model_cfg.get("provider", "mock")
+    provider = ProviderFactory.create_provider(
+        provider_name=provider_name,
+        model_config=model_cfg,
+        system_prompt=system_prompt,
+        api_key=Config.get_api_key_for_model(model_cfg),
+    )
+
+    start = time.perf_counter()
+    text, basari, hata = "", True, None
+    try:
+        text = provider.raw_generate(user_prompt, json_mode=json_mode)
+        if not text.strip():
+            basari, hata = False, "boş yanıt"
+    except Exception as exc:  # noqa: BLE001 — trace'e yazılıp devam edilir
+        basari, hata, text = False, f"{type(exc).__name__}: {exc}", ""
+    elapsed = round(time.perf_counter() - start, 3)
+
+    trace = _trace(asama, model_id, provider_name, user_prompt, text, elapsed, basari, hata)
+    return HamCagriSonucu(text=text, trace=trace)

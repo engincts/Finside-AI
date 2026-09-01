@@ -105,3 +105,26 @@ class HuggingFaceProvider(BaseProvider):
         err_msg = f"HuggingFace API Hata ({self.model_name}): {last_error}"
         print(f"[HATA] {err_msg}")
         return self.generate_mock_report(user_prompt, is_fallback=True, reason=err_msg)
+
+    def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
+        if not self.api_key:
+            raise RuntimeError(f"HuggingFace raw_generate: HF_TOKEN yok ({self.model_name}).")
+        if not HAS_HUGGINGFACE:
+            raise RuntimeError("HuggingFace raw_generate: huggingface_hub paketi yüklü değil.")
+
+        system_prompt = self.system_prompt
+        if json_mode:
+            system_prompt += "\n\nYalnızca geçerli JSON döndür; başında/sonunda açıklama olmasın."
+
+        client = InferenceClient(model=self.model_name, token=self.api_key)
+        stream = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            stream=True,
+        )
+        return "".join((part.choices[0].delta.content or "") for part in stream if part.choices)

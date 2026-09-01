@@ -35,6 +35,32 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 Doğrulama: tüm dosyalar derleniyor; `rapor_cagrisi('mock', …)` + `append_trace` mock
 ile uçtan uca çalıştı. Canlı API çağrısı yapılmadı.
 
+### Faz 1-2 — Segmentasyon + Triyaj
+
+- **`providers/`:** `BaseProvider.raw_generate(user_prompt, *, json_mode)` — şemasız ham
+  metin üretimi; 5 provider'da (gemini/openai/anthropic/huggingface/mock) uygulandı.
+- **`pipeline/llm_call.py`:** `ham_cagri` — trace'li ham metin çağrısı (hata → `basari=False`).
+- **`chunking.py`:** başlık regex'leri genişletildi (Romen rakamı, "Ek N", alt-dipnot);
+  `_is_heading` sayısal tablo satırlarını (bilanço kalemleri) artık başlık saymıyor.
+- **`loaders/bdr_segmenter.py`** (yeni): `regex_segmentle` (offset'li `Segment` üretimi +
+  küçük parça birleştirme), `segmentation_confidence` (5 boyut, dev segment → LLM
+  fallback zorlaması), `segment_bdr` (güven < eşik → `segmenter_v1.md` LLM fallback,
+  ipuçları `rapidfuzz` ile konumlanır).
+- **`pipeline/keyword_map.py`** (yeni): `RiskKategorisi` → anahtar kelime ileri eşlemesi
+  + boilerplate ibareleri (kural-tabanlı triyaj ön-filtresi).
+- **`pipeline/nodes/segment.py`:** `segmentle` node → `segments.json`.
+- **`pipeline/nodes/triage.py`:** `triyaj_yap` (kural + boilerplate + şüpheli → ucuz
+  LLM ikili sınıflandırma, recall-güvenli), `gruplari_olustur` (karakter bütçesine göre
+  paketleme + dev segment hard-split) → `triage_log.json`.
+- **`pipeline/graph.py`** (yeni): `segmentle → triyaj_yap → gruplari_olustur → END`.
+- **`prompts/`:** `segmenter_v1.md`, `triage_v1.md`.
+- **`report_writer.py`:** `save_json` (ara çıktı dosyaları).
+
+Doğrulama (mock, 593K karakterlik Borusan BDR'si): 53 segment / güven 0.82, triyaj
+kural=12 / llm=41, 8 segment grubu (hepsi ≤ 88K karakter). **Batch resume testi:**
+`triyaj_yap`'ta simüle hata → `invoke(None)` ile checkpoint'ten devam, `segmentle`
+yeniden çalışmadı. Canlı API çağrısı yapılmadı.
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B

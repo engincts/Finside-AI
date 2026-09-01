@@ -67,3 +67,28 @@ class OpenAIProvider(BaseProvider):
                 err_msg = f"OpenAI API Hata ({self.model_name}): {e}"
             print(f"[HATA] {err_msg}")
             return self.generate_mock_report(user_prompt, is_fallback=True, reason=err_msg)
+
+    def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
+        if not self.api_key:
+            raise RuntimeError(f"OpenAI raw_generate: OPENAI_API_KEY yok ({self.model_name}).")
+        if not HAS_OPENAI:
+            raise RuntimeError("OpenAI raw_generate: openai paketi yüklü değil.")
+
+        client = OpenAI(api_key=self.api_key)
+        kwargs = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        if "o1" in self.model_name or "o3" in self.model_name:
+            kwargs["max_completion_tokens"] = self.max_tokens
+            kwargs["reasoning_effort"] = str(self.reasoning_effort).lower()
+        else:
+            kwargs["max_tokens"] = min(self.max_tokens, 4096)
+            kwargs["temperature"] = self.temperature
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        return client.chat.completions.create(**kwargs).choices[0].message.content or ""
