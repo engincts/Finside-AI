@@ -1,13 +1,15 @@
-"""Ana LangGraph pipeline. Faz 1-8.
+"""Ana LangGraph pipeline. Faz 1-10.
 
 Akış:
   segmentle → triyaj_yap → gruplari_olustur ─(Send: grup×model)→ map_worker → map_topla
-  ─(Send: grup)→ grup_isle (alt-graf: ground → reconcile ⇄ critic) → sentezle → qa_kontrol → END
+  ─(Send: grup)→ grup_isle (alt-graf: ground → reconcile ⇄ critic)
+  → sentezle → qa_kontrol → maliyet_ozetle → END
 """
 
 from langgraph.graph import START, END, StateGraph
 
 from finside.pipeline.group_graph import build_group_graph
+from finside.pipeline.nodes.cost import maliyet_ozetle
 from finside.pipeline.nodes.group import grup_dagit
 from finside.pipeline.nodes.map_extract import map_dagit, map_topla, map_worker
 from finside.pipeline.nodes.segment import segmentle
@@ -27,6 +29,7 @@ def build_graph(checkpointer=None):
     graph.add_node("grup_isle", build_group_graph())
     graph.add_node("sentezle", sentezle)
     graph.add_node("qa_kontrol", qa_kontrol)
+    graph.add_node("maliyet_ozetle", maliyet_ozetle)
 
     graph.add_edge(START, "segmentle")
     graph.add_edge("segmentle", "triyaj_yap")
@@ -36,6 +39,7 @@ def build_graph(checkpointer=None):
     graph.add_conditional_edges("map_topla", grup_dagit, ["grup_isle"])
     graph.add_edge("grup_isle", "sentezle")
     graph.add_edge("sentezle", "qa_kontrol")
-    graph.add_edge("qa_kontrol", END)
+    graph.add_edge("qa_kontrol", "maliyet_ozetle")
+    graph.add_edge("maliyet_ozetle", END)
 
     return graph.compile(checkpointer=checkpointer)

@@ -128,6 +128,25 @@ oylaması doğru (Borusan / 31 Aralık 2024 / Olumlu Görüş), 4 risk (32→ded
 doğru tetiklendi ("risklerin %75'i doğrulanamadı" — mock alıntılar gerçek metinle
 eşleşmiyor), 67 trace kaydı, graph tamamlandı.
 
+### Faz 9-10 — Batch + Maliyet/Süre Şeffaflığı
+
+- **`pipeline/nodes/cost.py`** (yeni): `maliyet_ozetle` node — `state.trace`'ten toplam
+  çağrı, aşama kırılımı, tahmini token (karakter/4), toplam süre, tahmini USD (model
+  bazında opsiyonel `usd_1k_in`/`usd_1k_out`). `nihai_rapor.pipeline_izi` +
+  `pipeline_izi.json`.
+- **`pipeline/batch.py`** (yeni): `calistir_batch(klasor, secili_modeller)` — her `.txt`
+  ayrı `thread_id`; `_checkpointer` Postgres'i dener, erişilemezse (Docker kapalı vb.)
+  `MemorySaver`'a düşer (uyarı ile, hang yok — `connect_timeout=5`).
+  `outputs/<tarih>/<saat>/<bdr>/` + kökte `portfoy_ozeti.md`/`.json`.
+- **`report_writer.py`:** `save_portfolio_summary`.
+- **`run_poc.py`:** `--batch <klasör>` + `--map-models a,b,c`.
+- **`graph.py`:** `… qa_kontrol → maliyet_ozetle → END`.
+
+Doğrulama (mock, `--batch data/bdr_samples`, Postgres kapalı): `portfoy_ozeti.md`
+üretildi, her BDR kendi klasöründe tüm ara çıktılarla; `pipeline_izi.json` — 43 çağrı,
+aşama kırılımı, ~129K girdi token. Batch resume için `PostgresSaver` yolu (Docker'lı)
+kullanıcı testine hazır.
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B

@@ -36,6 +36,32 @@ class ReportWriter:
         )
 
     @classmethod
+    def save_portfolio_summary(cls, kok_dir: Path, satirlar: List[Dict[str, Any]]):
+        """Batch çalıştırma sonunda tek portföy özeti (tüm BDR'ler)."""
+        md_lines = [
+            "# Finside AI — Pipeline Portföy Özeti",
+            f"**Tarih/Saat:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
+            f"**İşlenen BDR:** {len(satirlar)}",
+            "",
+            "| Dosya | Firma | Dönem | Karar Eğilimi | Risk | QA Bayrak | Süre (sn) | ~USD | Modeller |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        ]
+        def _g(deger):
+            return deger if deger is not None else "-"
+
+        for s in satirlar:
+            md_lines.append(
+                f"| `{s.get('dosya', '-')}` | {s.get('firma') or '-'} | {s.get('donem') or '-'} "
+                f"| `{s.get('karar') or '-'}` | {s.get('risk_sayisi', 0)} | {s.get('qa_bayrak', 0)} "
+                f"| `{_g(s.get('sure_sn'))}` | `{_g(s.get('usd'))}` "
+                f"| {', '.join(s.get('modeller', []))} |"
+            )
+        (kok_dir / "portfoy_ozeti.md").write_text("\n".join(md_lines), encoding="utf-8")
+        (kok_dir / "portfoy_ozeti.json").write_text(
+            json.dumps(satirlar, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    @classmethod
     def append_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
         """Pipeline LLM çağrı izlerini satır satır `trace.jsonl`'e ekler (append)."""
         if not kayitlar:
