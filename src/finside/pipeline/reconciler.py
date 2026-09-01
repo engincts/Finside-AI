@@ -67,12 +67,13 @@ def uzlastir(
     if sonuc.report.is_mock_fallback or not sonuc.report.tespit_edilen_riskler:
         return on_birlesik, celiskiler, [sonuc.trace]
 
+    # kaynak_modeller izlenebilirlik alanıdır — LLM'in üretebileceği bir değer değil,
+    # her zaman mekanik eşleşmeden (başlık) deterministik olarak atanır.
     kaynak_haritasi = {_anahtar(r): r.get("kaynak_modeller", []) for r in on_birlesik}
     llm_riskler = []
     for risk in sonuc.report.tespit_edilen_riskler:
         veri = risk.model_dump(mode="json")
-        if not veri.get("kaynak_modeller"):
-            veri["kaynak_modeller"] = kaynak_haritasi.get(_anahtar(veri), [])
+        veri["kaynak_modeller"] = kaynak_haritasi.get(_anahtar(veri), [])
         llm_riskler.append(veri)
 
     llm_basliklar = {_anahtar(r) for r in llm_riskler}

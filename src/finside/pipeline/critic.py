@@ -43,9 +43,11 @@ def eksik_tara(
         return [], [sonuc.trace]
 
     mevcut = {_anahtar(r) for r in taslak_riskler}
-    yeni = [
-        r.model_dump(mode="json")
-        for r in sonuc.report.tespit_edilen_riskler
-        if _anahtar(r.model_dump()) not in mevcut
-    ]
+    yeni = []
+    for r in sonuc.report.tespit_edilen_riskler:
+        veri = r.model_dump(mode="json")
+        if _anahtar(veri) in mevcut:
+            continue
+        veri["kaynak_modeller"] = ["critic"]  # LLM'in ürettiği değeri değil, deterministik işareti kullan
+        yeni.append(veri)
     return yeni, [sonuc.trace]

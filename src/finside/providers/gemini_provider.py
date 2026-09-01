@@ -1,3 +1,4 @@
+import time
 from typing import Dict, Any
 from finside.providers.base import BaseProvider
 from prompts.schemas import BDRRiskAnalysisReport
@@ -9,9 +10,17 @@ try:
 except ImportError:
     HAS_GENAI = False
 
+_RATE_LIMIT_DENEME = 2
+_RATE_LIMIT_BEKLEME_SN = 8
+
 
 class GeminiProvider(BaseProvider):
     """Google Gemini API entegrasyon sağlayıcısı (Google GenAI Chat SDK Uyumlu)."""
+
+    @staticmethod
+    def _rate_limited(err: Exception) -> bool:
+        s = str(err)
+        return "429" in s or "RESOURCE_EXHAUSTED" in s
 
     def analyze(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
@@ -38,16 +47,25 @@ class GeminiProvider(BaseProvider):
 
             gen_config = genai_types.GenerateContentConfig(**config_kwargs)
 
-            # Google GenAI SDK Tavsiyesi: AFC / Structured Output için Chat.send_message kullanımı
-            try:
-                chat = client.chats.create(model=self.model_name, config=gen_config)
-                response = chat.send_message(user_prompt)
-            except Exception:
-                response = client.models.generate_content(
-                    model=self.model_name,
-                    contents=user_prompt,
-                    config=gen_config
-                )
+            response = None
+            for deneme in range(_RATE_LIMIT_DENEME):
+                try:
+                    # Google GenAI SDK Tavsiyesi: AFC / Structured Output için Chat.send_message kullanımı
+                    try:
+                        chat = client.chats.create(model=self.model_name, config=gen_config)
+                        response = chat.send_message(user_prompt)
+                    except Exception:
+                        response = client.models.generate_content(
+                            model=self.model_name,
+                            contents=user_prompt,
+                            config=gen_config
+                        )
+                    break
+                except Exception as e:
+                    if self._rate_limited(e) and deneme + 1 < _RATE_LIMIT_DENEME:
+                        time.sleep(_RATE_LIMIT_BEKLEME_SN)
+                        continue
+                    raise
 
             raw_text = response.text if hasattr(response, "text") and response.text else "{}"
             report = self._parse_report(raw_text)

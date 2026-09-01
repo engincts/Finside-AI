@@ -17,6 +17,8 @@ from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem
 
 _KUNYE_ALANLARI = ("firma_adi", "rapor_donemi", "denetim_firmasi", "denetci_gorusu")
 _EMBED_ANAHTAR_ENV = "OPENAI_API_KEY"
+# Şema varsayılanları oy çoğunluğuna karışmasın (bkz. schemas.py alan varsayılanları)
+_SEMA_VARSAYILANLARI = {"Belirtilmemiş Şirket", "Belirtilmemiş Dönem"}
 
 
 def _kunye_oyla(ciktilar: List[dict]) -> dict:
@@ -25,7 +27,7 @@ def _kunye_oyla(ciktilar: List[dict]) -> dict:
         sayac = Counter(
             c["kunye"].get(alan)
             for c in ciktilar
-            if c.get("kunye") and c["kunye"].get(alan)
+            if c.get("kunye") and c["kunye"].get(alan) not in _SEMA_VARSAYILANLARI
         )
         kunye[alan] = sayac.most_common(1)[0][0] if sayac else None
     return kunye
