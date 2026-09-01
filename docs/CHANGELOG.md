@@ -4,6 +4,39 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — Multi-agent pipeline: tasarım + Faz 0
+
+### Tasarım
+
+- **`docs/PIPELINE_DESIGN.md`** (v0.2) — 10 fazlı LangGraph pipeline'ın mevcut koda
+  eşlenmesi. Kararlar: iki yol paralel (`BDRAnalyzer` + `pipeline/`), critic = graph
+  cycle, `PostgresSaver` baştan, ensemble map modelleri UI'dan seçilebilir.
+
+### Faz 0 — Altyapı
+
+- **Bağımlılıklar:** `langgraph`, `langgraph-checkpoint-postgres`, `psycopg[binary]`,
+  `rapidfuzz` — venv'e kuruldu, `requirements.txt`'e eklendi (`pip check` temiz).
+- **`docker-compose.yml`** — pipeline checkpoint için `postgres:17-alpine` servisi;
+  `.env` / `.env.example`'a `PIPELINE_DB_URL`.
+- **`config.json`:** `pipeline` bloğu (model rolleri + eşikler) + `mock` model id
+  (mock-first geliştirme için).
+- **`config.py`:** `get_model_config_by_id` (enabled bakmadan), `get_pipeline_config`,
+  `get_pipeline_db_url`, `PIPELINE_DEFAULTS`.
+- **`prompts/schemas.py`:** `BDRRiskItem.dogrulanmadi` / `.kaynak_modeller`,
+  `BDRRiskAnalysisReport.qa_bayraklari` (hepsi primitive/liste — strict schema'yı
+  bozmaz). `pipeline_izi` modele eklenmedi (serbest dict strict schema'yı bozar);
+  dosyaya yazılırken eklenecek.
+- **`src/finside/pipeline/`** (yeni paket): `state.py` (`PipelineState`, `GrupState`,
+  `Segment`/`TriajKarari`/`SegmentGrubu`/`MapCiktisi`/`TraceKaydi` TypedDict'leri,
+  `operator.add` reducer'ları), `llm_call.py` (`rapor_cagrisi` — trace'li tek model
+  çağrısı, `ProviderFactory` üstünde).
+- **`report_writer.py`:** `append_trace` → `outputs/.../trace.jsonl`.
+
+Doğrulama: tüm dosyalar derleniyor; `rapor_cagrisi('mock', …)` + `append_trace` mock
+ile uçtan uca çalıştı. Canlı API çağrısı yapılmadı.
+
+---
+
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B
 
 ### Değişen

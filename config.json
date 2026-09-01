@@ -7,7 +7,30 @@
   "default_reasoning_effort": "high",
   "default_strict_schema": true,
   "default_prompt_file": "bdr_analyst_v1.md",
+  "pipeline": {
+    "map_models": ["gemini-3.6-flash", "claude-sonnet-4-5", "gpt-oss-120b"],
+    "triage_model": "gpt-4o-mini",
+    "reconciler_model": "claude-sonnet-4-5",
+    "critic_model": "gemini-3.6-flash",
+    "synthesis_model": "claude-sonnet-4-5",
+    "segmenter_fallback_model": "gemini-3.6-flash",
+    "segmenter_guven_esigi": 0.6,
+    "segment_grup_karakter_butcesi": 88000,
+    "grounding_esigi": 85,
+    "grounding_katimod": false,
+    "max_critic_turu": 2
+  },
   "models": [
+    {
+      "id": "mock",
+      "name": "Mock (Test / Simülasyon)",
+      "provider": "mock",
+      "model_name": "mock-v1",
+      "api_key_env": "",
+      "max_tokens": 8192,
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": false
+    },
     {
       "id": "gemini-3.6-flash",
       "name": "Google Gemini 3.6 Flash",

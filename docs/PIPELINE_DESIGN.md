@@ -337,21 +337,26 @@ taslak_riskler, celiskiler, critic_tur}`. `grup_bitir` sonucu ana state'in
 
 ## 7. Şema Eklemeleri (`prompts/schemas.py`)
 
-Minimal — mevcut alanlar bozulmaz:
+Minimal — mevcut alanlar bozulmaz, hepsi primitive/liste (strict schema sağlayıcılarını —
+OpenAI `parse`, Gemini `response_schema`, Anthropic tool-use — bozmaz):
 
 ```python
 class BDRRiskItem(BaseModel):
     ...
     dogrulanmadi: bool = Field(False, description="Faz 4: kaynak alıntısı ham metinde bulunamadı.")
-    kaynak_modeller: list[str] = Field(default_factory=list, description="Bu kalemi üreten map modelleri.")
+    kaynak_modeller: List[str] = Field(default_factory=list, description="Faz 3: bu kalemi üreten map modelleri.")
 
 class BDRRiskAnalysisReport(BaseModel):
     ...
-    qa_bayraklari: list[str] = Field(default_factory=list, description="Faz 8 kural tabanlı uyarılar.")
-    pipeline_izi: Optional[dict] = Field(None, description="Faz/çağrı/süre özeti (Faz 10).")
+    qa_bayraklari: List[str] = Field(default_factory=list, description="Faz 8 kural tabanlı uyarılar.")
 ```
 
-`hata_durumu` **eklenmez** — mevcut `is_mock_fallback` + `fallback_reason` yeterli.
+- `pipeline_izi` (Faz 10 faz/çağrı/maliyet özeti) **Pydantic modele eklenmez** — serbest `dict`
+  strict schema'yı bozar. Bunun yerine dosyaya yazılırken `{**report.model_dump(), "pipeline_izi": {...}}`
+  olarak eklenir; ayrıca `trace.jsonl` ve `summary_metrics.md`'de tutulur.
+- `hata_durumu` **eklenmez** — mevcut `is_mock_fallback` + `fallback_reason` yeterli.
+- `dogrulanmadi` / `kaynak_modeller` map/sentez LLM'i tarafından da doldurulur ama Faz 3/4
+  bunları deterministik olarak ezer; legacy `BDRAnalyzer` yolunda zararsız (varsayılan kalır).
 
 ---
 

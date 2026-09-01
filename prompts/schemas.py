@@ -43,6 +43,8 @@ class BDRRiskItem(BaseModel):
     etki_degerlendirmesi: str = Field(..., description="Riskin borç ödeme kapasitesi veya likidite üzerindeki etkisi.")
     risk_derecesi: RiskDerecesi = Field(..., description="Kredi analisti açısından riskin derece sınıfı.")
     kaynak_metin_alintisi: str = Field(..., description="BDR metninden alınan doğrudan alıntı.")
+    dogrulanmadi: bool = Field(False, description="Pipeline Faz 4: kaynak alıntısı ham metinde bulunamadı.")
+    kaynak_modeller: List[str] = Field(default_factory=list, description="Pipeline Faz 3: bu kalemi üreten map modelleri.")
 
     @field_validator("risk_kategorisi", mode="before")
     @classmethod
@@ -113,6 +115,7 @@ class BDRRiskAnalysisReport(BaseModel):
     komite_tavsiyesi_ve_sartlar: List[str] = Field(default_factory=list, description="Kredi Komitesine önerilen şartlar ve kısıtlar.")
     karar_egilimi: KomiteKararEgilimi = Field(..., description="Genel kredi komitesi karar eğilimi.")
     analist_gerekce_metni: str = Field(..., description="Analist kalitesinde gerekçelendirilmiş komite paragrafı.")
+    qa_bayraklari: List[str] = Field(default_factory=list, description="Pipeline Faz 8: kural tabanlı tutarlılık uyarıları.")
 
     @field_validator("denetci_gorusu", mode="before")
     @classmethod

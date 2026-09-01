@@ -29,6 +29,16 @@ class ReportWriter:
         json_file.write_text(report.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
+    def append_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+        """Pipeline LLM çağrı izlerini satır satır `trace.jsonl`'e ekler (append)."""
+        if not kayitlar:
+            return
+        trace_path = session_dir / "trace.jsonl"
+        with open(trace_path, "a", encoding="utf-8") as f:
+            for kayit in kayitlar:
+                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+
+    @classmethod
     def save_summary_metrics(cls, session_dir: Path, bdr_name: str, metrics_list: List[Dict[str, Any]]):
         summary_json_path = session_dir / "summary_metrics.json"
         summary_md_path = session_dir / "summary_metrics.md"
