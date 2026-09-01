@@ -55,6 +55,12 @@ def sentezle(state: PipelineState) -> dict:
 
     nihai = BDRRiskAnalysisReport(
         kullanilan_model=f"pipeline ({', '.join(map_modelleri(state))})",
+        # Sentez çağrısı mock fallback'e düştüyse (API hatası/kota) bunu sessizce
+        # yutmuyoruz — nihai raporun güvenilirlik bayrağı buna göre işaretlenir.
+        is_mock_fallback=ust.is_mock_fallback,
+        fallback_reason=(
+            f"Sentez adımı: {ust.fallback_reason}" if ust.is_mock_fallback else None
+        ),
         firma_adi=kunye.get("firma_adi") or ust.firma_adi,
         rapor_donemi=kunye.get("rapor_donemi") or ust.rapor_donemi,
         denetim_firmasi=kunye.get("denetim_firmasi") or ust.denetim_firmasi,
