@@ -34,6 +34,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_PARALLEL_MODELS = 8
+BDR_PREVIEW_CHARS = 20000
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -378,5 +379,22 @@ with tab_prompt:
 # TAB 4: RAW BDR INPUT TEXT VIEWER
 with tab_input:
     st.subheader(f"📄 İşlenen BDR Dosya İçeriği: `{bdr_name}`")
-    st.caption(f"Karakter Sayısı: {len(bdr_content)} | Kelime Sayısı: {len(bdr_content.split())}")
-    st.text_area("BDR Ham Metni", bdr_content, height=500)
+    st.caption(f"Karakter Sayısı: {len(bdr_content):,} | Kelime Sayısı: {len(bdr_content.split()):,}")
+
+    st.download_button(
+        "⬇️ Tam BDR Metnini İndir (.txt)",
+        data=bdr_content,
+        file_name=bdr_name,
+        mime="text/plain",
+    )
+
+    if len(bdr_content) > BDR_PREVIEW_CHARS:
+        st.info(
+            f"Tarayıcı performansı için ilk {BDR_PREVIEW_CHARS:,} karakter gösteriliyor. "
+            "Tamamı için indirme butonunu kullanın."
+        )
+        st.text(bdr_content[:BDR_PREVIEW_CHARS])
+        with st.expander("Tam metni yine de göster (tarayıcıyı yavaşlatabilir)"):
+            st.text(bdr_content)
+    else:
+        st.text(bdr_content)
