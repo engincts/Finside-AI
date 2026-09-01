@@ -1,8 +1,31 @@
 # Finside AI — Mimari & Teknoloji Dokümanı
 
-**Doküman Sürümü:** v1.0
+**Doküman Sürümü:** v1.1
 **Son Güncelleme:** 1 Eylül 2026
 **Kapsam:** BDR analiz motorunun uçtan uca işleyişi, kullanılan teknolojiler ve tasarım kararları.
+
+---
+
+## 0. İki Mod — hangisi ne zaman çalışır
+
+Uygulamada **iki bağımsız analiz yolu** var. Karışmazlar; ayrı butonlarla tetiklenir.
+
+| | **📊 Model Seçimi / Karşılaştırma** | **🔗 Multi-Agent Pipeline** |
+| :--- | :--- | :--- |
+| Amaç | "Hangi model bu iş için iyi?" — hızlı kıyas | Üretim kalitesinde nihai analiz |
+| Tetik | Sidebar **🚀 ANALİZİ BAŞLAT** | Pipeline sekmesi **🔗 PIPELINE BAŞLAT** |
+| Kod | `BDRAnalyzer` (`analyzer.py`) | `pipeline/` paketi (LangGraph) |
+| Model | Seçtiğin her model **ayrı ayrı**, paralel | Ensemble: aynı görevi 2-3 model birlikte |
+| Büyük girdi | Yapı-farkında chunking + **basit sentez** | Chunking + **grounding + uzlaştırma + critic** + sentez |
+| Doğrulama | Yok (ham model çıktısı) | rapidfuzz grounding, çelişki tespiti, eksik-tarama döngüsü |
+| LLM çağrısı / BDR | Model başına ~3-12 (chunk + sentez) | ~20-45 (ensemble × grup + reconcile + critic + sentez) |
+| Süre | Model başına ~10-660 sn (modele göre) | ~4-12 dk |
+| Çıktı | `<model_id>_report.md/json` + `summary_metrics` | `nihai_rapor.json` + `segments/triage/map_raw/trace` + `pipeline_izi` |
+| Sidebar ayarları (mod/model/parametre) | ✅ geçerli | ❌ geçerli değil (pipeline kendi ensemble seçimini kullanır) |
+
+**Neden ikisi ayrı:** Karşılaştırma tek modelin ham gücünü ölçer (blind spot'ları dahil).
+Pipeline bu blind spot'ları ensemble + critic ile telafi eder — ama BDR başına 20-45 çağrı
+maliyeti var, o yüzden önce karşılaştırmadan model kararı verilir.
 
 ---
 

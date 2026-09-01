@@ -4,6 +4,23 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — Benchmark hızı + iki mod dokümantasyonu
+
+- **`app.py`:** kıyas panelinde `truncate` denemesi geri alındı — tam yapı-farkında
+  chunking geri geldi (`bd9599c` → `7ec946f`). Sorun chunking değildi; Mihenk-35B'nin
+  HF serverless'te çağrı başına ~110 sn olması. `futures.wait(timeout=600)` eklendi:
+  bu süreyi aşan modeller "⏱️ zaman aşımı" ile atlanır, tamamlananlar gösterilir.
+- **`BDRAnalyzer.buyuk_girdi_stratejisi`** param'ı kaldı ("map_reduce" varsayılan;
+  "truncate" opsiyonel, UI'da kullanılmıyor).
+- **`docs/ARCHITECTURE.md` §0** (yeni): "İki Mod" — Model Seçimi/Karşılaştırma vs
+  Multi-Agent Pipeline karşılaştırma tablosu (amaç, tetik, kod, LLM çağrısı, süre,
+  çıktı, sidebar ayarları geçerli mi).
+- **`docs/PIPELINE_DESIGN.md` §8:** tek modelli pipeline çalıştırma notu (ör. sadece
+  gpt-oss-120b) — çalışır ama ensemble amacı kaybolur; reconciler/critic farklı model
+  kalmalı.
+
+---
+
 ## 2026-09-01 — Zayıf model kısmi çıktı toleransı + UI
 
 - **`schemas.py`:** zayıf modeller (ör. Mihenk-LLM-35B) geçerli JSON üretip

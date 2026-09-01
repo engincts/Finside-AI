@@ -380,6 +380,23 @@ class BDRRiskAnalysisReport(BaseModel):
 
 - `map_models` = **varsayılan** ensemble. UI'daki "Pipeline" panelinde bu liste ön-seçili gelir; kullanıcı çalıştırma başına ekleyip çıkarabilir → `state.secili_map_modelleri`. `run_poc.py --batch` varsayılanı kullanır (`--map-models a,b,c` ile ezilebilir).
 - Diğer roller (triage/reconciler/critic/synthesis) config'de sabit — benchmark tutarlılığı için UI'dan değiştirilmez.
+
+### Tek modelli çalıştırma (ör. sadece `gpt-oss-120b`)
+
+Çalışır. `secili_map_modelleri = ["gpt-oss-120b"]` seçilebilir. Ama:
+
+- **Ensemble'ın amacı kaybolur** — map aşamasında tek model → farklı modellerin birbirinin
+  körlüklerini yakalaması yok. Reconciler'ın uzlaştıracak bir şey kalmaz.
+- Yine de **reconciler + critic + synthesis rolleri** config'deki ayrı modellerle çalışır
+  (varsayılan: Claude / Gemini). Yani map=gpt-oss olsa bile, gpt-oss'un hataları
+  (aritmetik hata, eksik risk, chunk'lar arası çelişki) reduce aşamasında **başka bir
+  modelin** critic/reconcile geçişiyle kısmen yakalanır.
+- **Her rolü** gpt-oss yapmak isteniyorsa `config.json` `pipeline` bloğundaki tüm
+  `*_model` değerleri `gpt-oss-120b` yapılır → hızlı + ucuz ama critic aynı modelin
+  körlüklerini paylaşır, kalite düşer.
+
+**Öneri:** gpt-oss-120b'yi ensemble'da **2-3 modelden biri** olarak kullan; reconciler/critic
+farklı bir model (Gemini/Claude) kalsın.
 - `config.py`: `Config.get_pipeline_config()` — blok + varsayılanlar.
 - `.env`: `PIPELINE_DB_URL=postgresql://finside:finside@localhost:5432/finside_pipeline`
 
