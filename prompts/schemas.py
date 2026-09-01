@@ -99,6 +99,10 @@ class KomiteKararEgilimi(str, Enum):
     OLUMLU = "Olumlu (Kredi Tahsis Edilebilir)"
     SARTLI_OLUMLU = "Şartlı Olumlu (Ek Teminat / Kısıtlayıcı Taahhüt-Covenant İle)"
     OLUMSUZ = "Olumsuz (Yüksek Kalitatif Risk)"
+    BELIRSIZ = "Belirsiz (Model Karar Üretmedi)"
+
+
+_ALAN_URETILMEDI = "(Model bu alanı üretmedi)"
 
 
 class BDRRiskAnalysisReport(BaseModel):
@@ -111,10 +115,10 @@ class BDRRiskAnalysisReport(BaseModel):
     denetim_firmasi: Optional[str] = Field(None, description="Bağımsız Denetim Kuruluşu (EY, PwC, Deloitte, KPMG vb.).")
     denetci_gorusu: Optional[DenetciGorusTuru] = Field(DenetciGorusTuru.OLUMLU, description="Bağımsız denetçinin rapor görüşü.")
     tespit_edilen_riskler: List[BDRRiskItem] = Field(default_factory=list, description="BDR'den çıkarılan kalitatif risk kalemleri.")
-    genel_kredi_risk_ozeti: str = Field(..., description="Tüm risklerin toplu kredi riski özeti.")
+    genel_kredi_risk_ozeti: str = Field(_ALAN_URETILMEDI, description="Tüm risklerin toplu kredi riski özeti.")
     komite_tavsiyesi_ve_sartlar: List[str] = Field(default_factory=list, description="Kredi Komitesine önerilen şartlar ve kısıtlar.")
-    karar_egilimi: KomiteKararEgilimi = Field(..., description="Genel kredi komitesi karar eğilimi.")
-    analist_gerekce_metni: str = Field(..., description="Analist kalitesinde gerekçelendirilmiş komite paragrafı.")
+    karar_egilimi: KomiteKararEgilimi = Field(KomiteKararEgilimi.BELIRSIZ, description="Genel kredi komitesi karar eğilimi.")
+    analist_gerekce_metni: str = Field(_ALAN_URETILMEDI, description="Analist kalitesinde gerekçelendirilmiş komite paragrafı.")
     qa_bayraklari: List[str] = Field(default_factory=list, description="Pipeline Faz 8: kural tabanlı tutarlılık uyarıları.")
 
     @field_validator("denetci_gorusu", mode="before")
@@ -135,6 +139,8 @@ class BDRRiskAnalysisReport(BaseModel):
     @field_validator("karar_egilimi", mode="before")
     @classmethod
     def normalize_karar_egilimi(cls, v: Any) -> str:
+        if v is None:
+            return KomiteKararEgilimi.BELIRSIZ.value
         if isinstance(v, str):
             v_clean = v.strip().lower()
             if "şartlı" in v_clean or "sartli" in v_clean or "covenant" in v_clean:
@@ -143,4 +149,5 @@ class BDRRiskAnalysisReport(BaseModel):
                 return KomiteKararEgilimi.OLUMSUZ.value
             if "olumlu" in v_clean:
                 return KomiteKararEgilimi.OLUMLU.value
+            return KomiteKararEgilimi.BELIRSIZ.value
         return v

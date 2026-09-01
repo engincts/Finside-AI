@@ -4,6 +4,22 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — Zayıf model kısmi çıktı toleransı + UI
+
+- **`schemas.py`:** zayıf modeller (ör. Mihenk-LLM-35B) geçerli JSON üretip
+  `genel_kredi_risk_ozeti` / `karar_egilimi` / `analist_gerekce_metni` alanlarını
+  boş bırakınca tüm rapor doğrulama hatasıyla çöküyordu → bu üç alana varsayılan
+  verildi (`_ALAN_URETILMEDI` metni + yeni `KomiteKararEgilimi.BELIRSIZ`).
+  `normalize_karar_egilimi` bilinmeyen/None değeri → `BELIRSIZ`. Strict schema
+  sağlayıcıları (OpenAI/Gemini/Anthropic) etkilenmez; benchmark'ta zayıf model artık
+  "13 risk + Belirsiz karar" olarak görünür, mock fallback'e düşmez.
+- **`app.py`:** BDR Metin Görünümü `st.container(height=560)` kaydırmalı kutuda; Model
+  Çıktı Raporları yeniden `st.tabs` (üstten yatay geçiş), her rapor
+  `st.container(height=600)` içinde; pipeline sekmesi benchmark'tan net ayrıldı
+  (uyarı + "maliyeti anladım" onayı).
+
+---
+
 ## 2026-09-01 — Multi-agent pipeline: tasarım + Faz 0
 
 ### Tasarım
