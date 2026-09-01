@@ -212,11 +212,12 @@ except TypeError:
     run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
 
 # MAIN BODY TABS
-tab_overview, tab_reports, tab_prompt, tab_input = st.tabs([
-    "📊 Karşılaştırma Paneli", 
-    "🤖 Model Çıktı Raporları", 
-    "📝 Canlı Prompt Düzenleyici", 
-    "📄 BDR Metin Görünümü"
+tab_overview, tab_reports, tab_prompt, tab_input, tab_pipeline = st.tabs([
+    "📊 Karşılaştırma Paneli",
+    "🤖 Model Çıktı Raporları",
+    "📝 Canlı Prompt Düzenleyici",
+    "📄 BDR Metin Görünümü",
+    "🔗 Multi-Agent Pipeline"
 ])
 
 # SESSION STATE STORAGE FOR RESULTS
@@ -401,3 +402,101 @@ with tab_input:
             st.text(bdr_content)
     else:
         st.text(bdr_content)
+
+# TAB 5: MULTI-AGENT PIPELINE (Faz 9.6)
+FAZ_ETIKETLERI = {
+    "segmentle": "1 · Segmentasyon",
+    "triyaj_yap": "2 · Triyaj",
+    "gruplari_olustur": "2 · Gruplama",
+    "map_worker": "3 · Ensemble Map çıkarımı",
+    "map_topla": "3 · Map birleştirme",
+    "grup_isle": "4-6 · Grounding + Uzlaştırma + Critic",
+    "sentezle": "7 · Sentez",
+    "qa_kontrol": "8 · Tutarlılık QA",
+    "maliyet_ozetle": "10 · Maliyet özeti",
+}
+
+if "pipeline_sonucu" not in st.session_state:
+    st.session_state.pipeline_sonucu = None
+
+with tab_pipeline:
+    st.subheader("🔗 Multi-Agent BDR Analiz Pipeline")
+    st.caption(
+        "Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA. "
+        "Tasarım: `docs/PIPELINE_DESIGN.md`"
+    )
+
+    pipeline_cfg = config_data.get("pipeline", {})
+    model_secenekleri = [m.get("id") for m in all_models]
+    varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
+    secili_ensemble = st.multiselect(
+        "Ensemble Map Modelleri (segment grubu başına paralel çalışır)",
+        options=model_secenekleri,
+        default=varsayilan_ensemble or model_secenekleri[:1],
+    )
+
+    try:
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch")
+    except TypeError:
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True)
+
+    if pipeline_btn and not secili_ensemble:
+        st.warning("⚠️ En az bir ensemble modeli seçiniz.")
+    elif pipeline_btn:
+        from langgraph.checkpoint.memory import MemorySaver
+        from finside.pipeline.graph import build_graph
+
+        pipe_session_dir, _ = ReportWriter.create_session_directory(bdr_name)
+        pipe_graph = build_graph(checkpointer=MemorySaver())
+        pipe_baslangic = {
+            "bdr_id": bdr_name,
+            "bdr_adi": bdr_name,
+            "ham_metin": bdr_content,
+            "session_dir": str(pipe_session_dir),
+            "secili_map_modelleri": secili_ensemble,
+        }
+        pipe_cfg_run = {"configurable": {"thread_id": bdr_name}, "recursion_limit": 150}
+
+        durum_alani = st.empty()
+        yapilan = set()
+        son_guncelleme = {}
+        with st.spinner("🔗 Pipeline çalışıyor…"):
+            for adim in pipe_graph.stream(pipe_baslangic, config=pipe_cfg_run, stream_mode="updates"):
+                for node, guncelleme in adim.items():
+                    yapilan.add(node)
+                    if guncelleme:
+                        son_guncelleme[node] = guncelleme
+                with durum_alani.container():
+                    for node, etiket in FAZ_ETIKETLERI.items():
+                        st.write(("✅ " if node in yapilan else "⏳ ") + etiket)
+
+        nihai = (son_guncelleme.get("maliyet_ozetle") or {}).get("nihai_rapor") \
+            or (son_guncelleme.get("qa_kontrol") or {}).get("nihai_rapor")
+        st.session_state.pipeline_sonucu = {"nihai": nihai, "dizin": str(pipe_session_dir)}
+        st.success(f"✅ Pipeline tamamlandı. Çıktılar: `{pipe_session_dir}`")
+
+    pipe_sonuc = st.session_state.pipeline_sonucu
+    if pipe_sonuc and pipe_sonuc.get("nihai"):
+        nr = pipe_sonuc["nihai"]
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        c1.info(f"**Firma:** {nr.get('firma_adi')}")
+        c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or '—'}")
+        c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+
+        for bayrak in nr.get("qa_bayraklari", []):
+            st.error(f"⚠️ QA: {bayrak}")
+
+        izi = nr.get("pipeline_izi") or {}
+        if izi:
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("LLM Çağrısı", izi.get("toplam_llm_cagrisi"))
+            m2.metric("Girdi Token (~)", f"{izi.get('tahmini_girdi_token', 0):,}")
+            m3.metric("Süre (sn)", izi.get("toplam_sure_sn"))
+            m4.metric("Tahmini USD", izi.get("tahmini_usd"))
+
+        st.markdown(f"### ⚠️ {len(nr.get('tespit_edilen_riskler', []))} Kalitatif Risk Kalemi")
+        st.markdown(f"**Genel Kredi Risk Özeti:** {nr.get('genel_kredi_risk_ozeti')}")
+        st.markdown(f"**Analist Gerekçesi:** {nr.get('analist_gerekce_metni')}")
+        with st.expander("Nihai rapor (JSON)"):
+            st.json(nr)

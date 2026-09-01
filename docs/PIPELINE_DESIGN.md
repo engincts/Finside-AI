@@ -441,4 +441,7 @@ Batch ×50 BDR → **25-45M token**. → Geliştirme `MockProvider` ile; gerçek
 | 4 | Faz 4-6 | `grounding.py`, `reconciler.py`, `critic.py`, `group_graph.py` + critic döngüsü | ✅ |
 | 5 | Faz 7-8 | `synthesis.py`, `qa_rules.py` + `synthesis_v1.md` | ✅ |
 | 6 | Faz 9-10 | `batch.py`, `run_poc.py --batch`, portföy özeti, maliyet | ✅ |
-| 7 | Faz 9.5-9.6 | few-shot bankası, UI akış paneli | — |
+| 7 | Faz 9.5-9.6 | few-shot bankası, UI akış paneli | ✅ |
+
+**Durum:** Faz 0-10 tamamlandı; tüm pipeline mock ile uçtan uca doğrulandı. Kalan: gerçek
+API ile tek-BDR canlı test (kullanıcı onayıyla) + few-shot bankasını gerçek örneklerle doldurma.

@@ -20,6 +20,20 @@ Kredi Komitesi Risk Raporu üretir → sonuçlar `outputs/` altına ve karşıla
 
 Ayrıntı: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · Değişiklik geçmişi: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
 
+### 🔗 Multi-Agent Pipeline (LangGraph)
+
+Tek-model motorunun yanında, çok sayıda BDR'yi **recall-odaklı** işleyen 10 fazlı
+LangGraph pipeline: segmentasyon → triyaj → ensemble map (çoklu model) → grounding
+(rapidfuzz) → uzlaştırma → critic (eksik tarama, döngülü) → sentez → QA → maliyet.
+
+```bash
+docker compose up -d                      # pipeline checkpoint DB (Postgres)
+python run_poc.py --batch data/bdr_samples --map-models gemini-3.6-flash,claude-sonnet-4-5,gpt-oss-120b
+```
+
+Streamlit'te **"🔗 Multi-Agent Pipeline"** sekmesinden tek BDR için canlı faz takibiyle
+çalıştırılabilir. Tasarım: **[docs/PIPELINE_DESIGN.md](docs/PIPELINE_DESIGN.md)**
+
 ---
 
 ## 🚀 Max Tokens & Muhakeme Kapasitesi

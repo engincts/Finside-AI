@@ -147,6 +147,21 @@ Doğrulama (mock, `--batch data/bdr_samples`, Postgres kapalı): `portfoy_ozeti.
 aşama kırılımı, ~129K girdi token. Batch resume için `PostgresSaver` yolu (Docker'lı)
 kullanıcı testine hazır.
 
+### Faz 9.5-9.6 — Few-shot bankası + UI akış paneli
+
+- **`pipeline/few_shot.py`** (yeni): `ilgili_ornekler` — risk listesindeki baskın
+  kategorilere göre `prompts/few_shot_examples/<kategori>/*.json`'dan en çok 2 örnek
+  seçip sentez promptuna ekler (embedding yok). Banka boşken `''` döner.
+- **`prompts/few_shot_examples/`** — `README.md` (format) + `_SABLON.json`.
+- **`synthesis.py`:** `sentezle` few-shot bloğunu user prompt başına ekliyor.
+- **`app.py`:** yeni "🔗 Multi-Agent Pipeline" sekmesi — ensemble model çoklu seçim,
+  `graph.stream(stream_mode="updates")` ile canlı faz göstergesi (✅/⏳), bitince
+  firma/görüş/karar kartları + `pipeline_izi` metrikleri + risk özeti + JSON.
+
+Doğrulama (mock): `few_shot.ilgili_ornekler` boş bankada `''`; `graph.stream` node akışı
+UI faz göstergesi için doğru (`map_worker`×8, `grup_isle`×8, diğerleri ×1). Gerçek API
+testi yapılmadı.
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B

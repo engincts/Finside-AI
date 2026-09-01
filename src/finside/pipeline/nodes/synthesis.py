@@ -7,6 +7,7 @@ from typing import List
 from config import Config
 from finside.dedupe import dedup_risk_dicts
 from finside.loaders.prompt_loader import PromptLoader
+from finside.pipeline.few_shot import ilgili_ornekler
 from finside.pipeline.llm_call import rapor_cagrisi
 from finside.pipeline.nodes.map_extract import map_modelleri
 from finside.pipeline.qa_rules import qa_bayraklari
@@ -37,14 +38,16 @@ def sentezle(state: PipelineState) -> dict:
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
 
     sistem, sablon = PromptLoader.load_prompt_md("synthesis_v1.md")
+    user_prompt = sablon.format(
+        kunye_json=json.dumps(kunye, ensure_ascii=False),
+        riskler_json=json.dumps(riskler, ensure_ascii=False, indent=2),
+    )
+    ornekler = ilgili_ornekler(riskler)
+    if ornekler:
+        user_prompt = ornekler + user_prompt
+
     sonuc = rapor_cagrisi(
-        pc["synthesis_model"],
-        sablon.format(
-            kunye_json=json.dumps(kunye, ensure_ascii=False),
-            riskler_json=json.dumps(riskler, ensure_ascii=False, indent=2),
-        ),
-        asama="faz7-sentez",
-        system_prompt=sistem,
+        pc["synthesis_model"], user_prompt, asama="faz7-sentez", system_prompt=sistem,
     )
     ust = sonuc.report
 
