@@ -312,19 +312,22 @@ with tab_reports:
         st.subheader("🤖 Model Çıktı Raporları")
         
         results = st.session_state.analysis_results
-        model_tabs = st.tabs([r["model_name"] for r in results])
+        st.caption("Detaylı raporu görmek için ilgili modelin başlığına tıklayın.")
 
-        for idx, r in enumerate(results):
-            with model_tabs[idx]:
-                report = r["report"]
-                
+        for r in results:
+            report = r["report"]
+            gorus = report.denetci_gorusu.value if report.denetci_gorusu else "Belirtilmemiş"
+            fallback_mark = " ⚠️ Mock" if report.is_mock_fallback else ""
+            label = f"{r['model_name']} — {report.karar_egilimi.value}{fallback_mark}"
+
+            with st.expander(label, expanded=False):
                 if report.is_mock_fallback:
                     st.warning(f"⚠️ **Mock Fallback Uyarısı**: Gerçek API hatası nedeniyle simülasyon raporu gösterilmektedir. (Hata: {report.fallback_reason})")
 
                 # Key Rapor Kartları
                 c1, c2, c3 = st.columns(3)
                 c1.info(f"**Firma:** {report.firma_adi}")
-                c2.success(f"**Denetçi Görüşü:** {report.denetci_gorusu.value if report.denetci_gorusu else 'Belirtilmemiş'}")
+                c2.success(f"**Denetçi Görüşü:** {gorus}")
                 c3.warning(f"**Karar Eğilimi:** {report.karar_egilimi.value}")
 
                 st.markdown("---")
