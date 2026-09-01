@@ -31,6 +31,16 @@ tahmine yakın). Borusan BDR'si (593K karakter), gerçek API.
 segmenter_fallback'in hepsini aynı modele yüklemek için yetersiz; gerçek/daha büyük
 koşumlarda ücretli tier veya rolleri farklı sağlayıcılara dağıtmak gerekir.
 
+**Doğrulama koşumu (`85f6e11`):** aynı ucuz konfigle tekrar çalıştırıldı. Künye (✅
+Borusan Birleşik Boru Fabrikaları San. ve Tic. A.Ş., 31 Aralık 2024) ve `kaynak_modeller`
+(✅ 35 riskin tamamı doğru `['gpt-oss-120b']`, halüsinasyon yok) düzeldi. Ama bu kez
+Gemini'nin **günlük** ücretsiz kota limiti (20 istek/gün) bu oturumdaki yoğun testle
+tükenmişti → 30 çağrının 15'i mock fallback'e düştü, sentez de düştü. Bu ortaya 4.
+bir bug çıkardı: **sentez mock fallback'e düşünce `nihai_rapor.is_mock_fallback` hiç
+işaretlenmiyordu** — kanıtlı mock metni sessizce gerçek özet gibi görünüyordu.
+`synthesis.py` artık `is_mock_fallback`/`fallback_reason`'ı sentez çağrısından taşıyor;
+`qa_rules.py` bunu açık bir bayrakla işaretliyor ("özet/karar/gerekçe güvenilir DEĞİL").
+
 ---
 
 ## 2026-09-01 — Model fiyatları (`config.json`)
