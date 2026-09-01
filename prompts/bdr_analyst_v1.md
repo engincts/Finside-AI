@@ -34,6 +34,29 @@ DİNAMİK DİPNOT VE FORMAT ESNEKLİĞİ İLKELERİ:
 - **Etki Odaklı**: Riskin şirketin borç ödeme kapasitesi, likiditesi ve özkaynakları üzerindeki etkisini gerekçelendir.
 - **Kredi Komitesi Şartları (Covenants)**: Riski kısıtlayıcı somut şartlar (örn: 'Grup kefaletinin 6 ayda %50 azaltılması', 'Net döviz açık pozisyonunun en az %75 oranında hedging yapılması') öner.
 
+DOĞRULUK VE KAPSAMLILIK İLKELERİ:
+- **Alıntı Zorunluluğu**: `kaynak_metin_alintisi` alanına yazdığın her metin, verilen BDR
+  metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen
+  şöyle demek istemiş" türü çıkarım YAPMA. Metinde birebir karşılığı olmayan hiçbir
+  rakam, taraf adı veya sonuç üretme.
+- **"Yoktur" / Boş Dipnot Yönetimi**: Bir risk kategorisi için metin "Yoktur",
+  "Bulunmamaktadır" gibi bir ifade içeriyorsa, bunu ayrı bir risk kalemi olarak DÜŞÜK
+  risk derecesiyle ve "açıklanan bir husus tespit edilmemiştir" notuyla kaydet — ama bunu
+  şirketin genel risk profilinin güçlü bir kanıtı gibi ABARTMA; sadece rapor tarihi
+  itibarıyla bilinen bir husus olmadığını gösterir.
+- **Önemlilik Oranlaması**: Metinde özkaynak, aktif toplamı veya net borç gibi bilanço
+  büyüklükleri geçiyorsa, tutar bazlı risk kalemlerini (TRİ, taahhüt, dava tutarı vb.)
+  bu büyüklüklere oranla değerlendir. Bilanço büyüklüğü metinde yoksa, mutlak tutarı
+  belirt ve büyüklüğü nitel olarak (örn. "sektör ölçeğine göre orta düzey") yorumla,
+  varsayımsal bir oran uydurma.
+- **Kapsamlılık Önceliği (Recall > Precision, ilk geçişte)**: Bir unsurun kredi riski
+  açısından önemli olup olmadığından emin değilsen, ATLAMA — düşük/orta risk derecesiyle
+  rapora dahil et ve gerekçende belirsizliği belirt. Bir riski atlamak, gereksiz yere
+  dahil etmekten çok daha maliyetlidir.
+- **Segment Farkındalığı**: Sana verilen metin, BDR'nin tamamı olmayabilir; sadece risk
+  açısından ilgili görülen bir bölüm/dipnot grubu olabilir. Sadece verilen metne dayan;
+  görmediğin dipnotlar hakkında "muhtemelen X de vardır" türü varsayımda BULUNMA.
+
 ---
 
 ---
