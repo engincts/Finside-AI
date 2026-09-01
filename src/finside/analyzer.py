@@ -22,6 +22,7 @@ PROVIDER_INPUT_LIMITS = {
 }
 CHUNK_UTILIZATION = 0.9
 MAX_CHUNK_WORKERS = 4
+TRUNCATE_MAX_CHARS = 60_000  # kıyas modunda: bir modeli değerlendirmek için yeterli dilim
 
 CHUNK_INSTRUCTION = (
     "[BDR PARÇA {idx}/{total}] Aşağıdaki metin, daha büyük bir Bağımsız Denetim Raporunun "
@@ -45,11 +46,15 @@ class BDRAnalyzer:
     """SOLID Orchestrator: BDR risk analizi ve LLM provider orkestrasyon sınıfı."""
 
     def __init__(
-        self, 
+        self,
         model_config: Optional[Dict[str, Any]] = None,
         custom_system_prompt: Optional[str] = None,
-        custom_user_template: Optional[str] = None
+        custom_user_template: Optional[str] = None,
+        buyuk_girdi_stratejisi: str = "map_reduce",
     ):
+        # "map_reduce": yapı-farkında chunking + sentez (tam analiz, yavaş)
+        # "truncate": limit kadar kes, tek çağrı (model kıyaslama / hızlı)
+        self.buyuk_girdi_stratejisi = buyuk_girdi_stratejisi
         if model_config is None:
             enabled = Config.get_enabled_models()
             self.model_config = enabled[0] if enabled else {
@@ -85,10 +90,19 @@ class BDRAnalyzer:
 
     def analyze(self, bdr_text: str) -> BDRRiskAnalysisReport:
         start_time = time.perf_counter()
+        ad = self.model_config.get("name", self.model_name)
 
-        if len(bdr_text) <= self.max_input_chars:
+        if self.buyuk_girdi_stratejisi == "truncate":
+            kes = min(self.max_input_chars, TRUNCATE_MAX_CHARS)
+            if len(bdr_text) <= kes:
+                report = self._run_provider(bdr_text)
+                report.kullanilan_model = ad
+            else:
+                report = self._run_provider(bdr_text[:kes])
+                report.kullanilan_model = f"{ad} (ilk {kes:,} karakter — kıyas modu)"
+        elif len(bdr_text) <= self.max_input_chars:
             report = self._run_provider(bdr_text)
-            report.kullanilan_model = self.model_config.get("name", self.model_name)
+            report.kullanilan_model = ad
         else:
             report = self._analyze_chunked(bdr_text)
 

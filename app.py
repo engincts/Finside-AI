@@ -80,10 +80,13 @@ def run_model_analysis(
     model_cfg["top_p"] = hyperparams["top_p"]
     model_cfg["repetition_penalty"] = hyperparams["repetition_penalty"]
 
+    # Kıyas modu: büyük BDR'yi chunk'lamak yerine limit kadar kesip tek çağrı yap
+    # (hız için; tam analiz Multi-Agent Pipeline sekmesinde).
     analyzer = BDRAnalyzer(
         model_config=model_cfg,
         custom_system_prompt=system_prompt,
         custom_user_template=user_template,
+        buyuk_girdi_stratejisi="truncate",
     )
     report = analyzer.analyze(bdr_content)
     md_content = analyzer.format_report_as_markdown(report)
