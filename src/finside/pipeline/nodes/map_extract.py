@@ -46,7 +46,7 @@ def map_worker(payload: dict) -> dict:
     except Exception as exc:  # noqa: BLE001 — bir modelin çökmesi diğerlerini durdurmaz
         hata = f"{type(exc).__name__}: {exc}"
         cikti = MapCiktisi(grup_id=grup["grup_id"], model_id=model_id, riskler=[],
-                           hata_durumu=hata, sure_sn=0.0)
+                           kunye={}, hata_durumu=hata, sure_sn=0.0)
         iz = TraceKaydi(asama="faz3-map", model_id=model_id, provider=None,
                         girdi_karakter=len(user_prompt), cikti_karakter=0,
                         sure_sn=0.0, basari=False, hata=hata)
@@ -54,16 +54,24 @@ def map_worker(payload: dict) -> dict:
 
     rapor = sonuc.report
     riskler: List[dict] = []
+    kunye: dict = {}
     if not rapor.is_mock_fallback:
         for risk in rapor.tespit_edilen_riskler:
             veri = risk.model_dump(mode="json")  # enum -> string: checkpoint-güvenli
             veri["kaynak_modeller"] = [model_id]
             riskler.append(veri)
+        kunye = {
+            "firma_adi": rapor.firma_adi,
+            "rapor_donemi": rapor.rapor_donemi,
+            "denetim_firmasi": rapor.denetim_firmasi,
+            "denetci_gorusu": rapor.denetci_gorusu.value if rapor.denetci_gorusu else None,
+        }
 
     cikti = MapCiktisi(
         grup_id=grup["grup_id"],
         model_id=model_id,
         riskler=riskler,
+        kunye=kunye,
         hata_durumu=rapor.fallback_reason if rapor.is_mock_fallback else None,
         sure_sn=sonuc.trace["sure_sn"],
     )

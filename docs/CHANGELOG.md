@@ -105,6 +105,29 @@ Doğrulama (mock, tam pipeline): 8 grup → 32 uzlaştırılmış risk, critic t
 **Critic döngü birim testi:** sahte critic her turda yeni risk döndürüyor →
 `max_critic_turu=2`'de durdu (2 reconcile + 2 critic).
 
+### Faz 7-8 — Sentez + QA
+
+- **`dedupe.py`:** `dedup_risk_dicts` — dict tabanlı global dedup (başlık + opsiyonel
+  embedding yakın-tekrar; `kaynak_modeller` birleşir, içerik kaybı yok).
+- **`pipeline/qa_rules.py`** (yeni, LLM'siz): `qa_bayraklari` — KRİTİK risk + Olumlu karar,
+  olumsuz denetçi görüşü + Olumlu karar, doğrulanmamış risk oranı > %30, boş risk +
+  çok segment.
+- **`pipeline/nodes/synthesis.py`** (yeni):
+  - `sentezle` — `uzlastirilmis_riskler` global dedup → künye çoğunluk oylaması
+    (`map_ciktilari[].kunye`) → Sentez LLM çağrısı (ham metin YOK, sadece risk listesi
+    + künye) → üst düzey alanlar LLM'den, `tespit_edilen_riskler` deterministik dedup
+    listesinden. `nihai_rapor` (dict).
+  - `qa_kontrol` — `qa_bayraklari` hesaplar, `nihai_rapor.json` + `trace.jsonl` yazar.
+- **`map_extract.py`:** `map_worker` artık `kunye` (firma/dönem/denetçi) da döndürüyor.
+- **`state.py`:** `MapCiktisi.kunye`.
+- **`graph.py`:** `… grup_isle → sentezle → qa_kontrol → END`.
+- **`prompts/synthesis_v1.md`.**
+
+Doğrulama (mock, tam pipeline, embedding kapalı): `nihai_rapor.json` üretildi, künye
+oylaması doğru (Borusan / 31 Aralık 2024 / Olumlu Görüş), 4 risk (32→dedup), QA bayrağı
+doğru tetiklendi ("risklerin %75'i doğrulanamadı" — mock alıntılar gerçek metinle
+eşleşmiyor), 67 trace kaydı, graph tamamlandı.
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B

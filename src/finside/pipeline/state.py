@@ -29,6 +29,7 @@ class MapCiktisi(TypedDict):
     grup_id: int
     model_id: str
     riskler: List[dict]
+    kunye: dict  # firma_adi / rapor_donemi / denetim_firmasi / denetci_gorusu
     hata_durumu: Optional[str]
     sure_sn: float
 
