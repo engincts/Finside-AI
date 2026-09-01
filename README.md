@@ -78,7 +78,8 @@ Finside-AI/
 ├── config.py                  # Konfigürasyon ve Env okuyucu
 ├── requirements.txt           # Tüm Python Bağımlılıkları Listesi
 ├── docs/
-│   ├── ARCHITECTURE.md        # Mimari & kullanılan teknolojiler (uçtan uca işleyiş)
+│   ├── ARCHITECTURE.md        # Mevcut tek-model motoru: uçtan uca işleyiş & teknolojiler
+│   ├── PIPELINE_DESIGN.md     # Multi-agent LangGraph pipeline tasarımı (v0.2, uygulama bekliyor)
 │   ├── CHANGELOG.md           # Sürüm / değişiklik günlüğü
 │   └── BENCHMARK_RESEARCH.md  # Açık & Kapalı Kaynak LLM Benchmark Özet Raporu
 ├── data/

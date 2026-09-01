@@ -1,8 +1,8 @@
 # Finside AI — Multi-Agent BDR Analiz Pipeline Tasarımı
 
-**Doküman Sürümü:** v0.1 (tasarım — kod yok)
+**Doküman Sürümü:** v0.2 (tasarım — kod yok)
 **Tarih:** 1 Eylül 2026
-**Durum:** Onay bekliyor. Bu doküman onaylandıktan sonra Faz 0'dan başlanarak uygulanır.
+**Durum:** Karar noktaları çözüldü (§11). Faz 0'dan başlanarak uygulanmaya hazır.
 
 Bu doküman, "Multi-Agent BDR Analiz Pipeline" görev listesinin (LangGraph tabanlı 10 fazlı
 plan) mevcut kod tabanına nasıl oturacağını tanımlar: LangGraph state şeması, node imzaları,
@@ -27,7 +27,7 @@ test stratejisi.
 
 | İhtiyaç | LangGraph karşılığı |
 |---|---|
-| Batch'te bir BDR hata alırsa yalnızca o thread, yalnızca başarısız node'dan devam etsin | Checkpointer (`MemorySaver` dev · `SqliteSaver`/`PostgresSaver` batch) + `thread_id` |
+| Batch'te bir BDR hata alırsa yalnızca o thread, yalnızca başarısız node'dan devam etsin | Checkpointer **`PostgresSaver`** (birim testlerde `MemorySaver`) + `thread_id` |
 | Segment grubu × model paralel dağıtım | `Send` API |
 | Paralel worker'ların ürettiği risk listelerinin elle merge kodu olmadan birleşmesi | `Annotated[List[...], operator.add]` reducer |
 | Critic "eksik var → uzlaştırmaya geri dön" döngüsü | Conditional edge + döngü (max-tur koruması ile) |
@@ -59,14 +59,15 @@ LangGraph maliyetini hak ediyor.
                  ┌───────────────▼────────────────────────────────┐
                  │ map_worker (Faz 3)  →  map_ciktilari [+]        │
                  └───────────────┬────────────────────────────────┘
-                                 │  Send( grup )  —  G paralel
+                                 │  Send( grup )  —  G paralel · her biri group_graph subgraph'ı
                  ┌───────────────▼────────────────────────────────┐
-                 │ grup_isle (Faz 4-6)                             │
+                 │ group_graph (subgraph, Faz 4-6)                 │
                  │   ground (rapidfuzz) → reconcile (LLM)          │
-                 │   → critic (LLM) ──eksik var?──┐                │
-                 │        ▲                        │ evet (max tur) │
-                 │        └────────────────────────┘                │
-                 │   → uzlastirilmis_riskler [+]                    │
+                 │        ▲                        │                │
+                 │        └──eksik & tur<max───── critic (LLM)      │
+                 │                                 │ yok/max        │
+                 │                            grup_bitir            │
+                 │   → uzlastirilmis_riskler [+] (ana state'e)      │
                  └───────────────┬────────────────────────────────┘
                                  ▼
                  ┌────────────────────────────────────────────────┐
@@ -134,6 +135,7 @@ class PipelineState(TypedDict):
     bdr_adi: str
     ham_metin: str
     session_dir: str
+    secili_map_modelleri: list[str]   # UI'dan seçilir; boşsa config.pipeline.map_models
 
     # --- Faz 1 ---
     segmentler: list[Segment]
@@ -184,13 +186,13 @@ src/finside/
 │   ├── prompt_loader.py        # KORUNUR
 │   └── bdr_segmenter.py        # YENİ — Faz 1 orkestrasyonu (chunking.py + güven + LLM fallback)
 ├── pipeline/                   # YENİ PAKET — LangGraph katmanı
-│   ├── state.py                # PipelineState + TypedDict'ler
-│   ├── graph.py                # StateGraph kurulumu, edge'ler, conditional'lar, compile
+│   ├── state.py                # PipelineState + GrupState + TypedDict'ler
+│   ├── graph.py                # Ana StateGraph — segment→triage→map(Send)→grup(Send)→sentez→qa→cost
+│   ├── group_graph.py          # Alt-graf (subgraph) — ground → reconcile ⇄ critic (cycle) → bitir
 │   ├── nodes/
 │   │   ├── segment.py          # segmentle
 │   │   ├── triage.py           # triyaj_yap + gruplari_olustur
 │   │   ├── map_extract.py      # map_worker (Send hedefi)
-│   │   ├── group_process.py    # grup_isle (ground → reconcile → critic)
 │   │   ├── synthesis.py        # sentezle
 │   │   ├── qa.py               # qa_kontrol
 │   │   └── cost.py             # maliyet_ozetle
@@ -223,7 +225,7 @@ prompts/
 
 | İş | Detay | Mevcut kod |
 |---|---|---|
-| LangGraph kurulumu | `requirements.txt`'e `langgraph`, `langgraph-checkpoint-sqlite`, `rapidfuzz` (sürümler Faz 0'da pinlenir). Kurulum onayı ayrıca istenir. | — |
+| LangGraph kurulumu | `requirements.txt`'e `langgraph`, `langgraph-checkpoint-postgres`, `psycopg[binary]`, `rapidfuzz` (sürümler Faz 0'da pinlenir). Postgres bağlantısı `.env`'de `PIPELINE_DB_URL`. Yerel Postgres yoksa Docker tek satır (`docker run postgres`) — kurulum + paket ekleme onayı ayrıca istenir. | — |
 | Hata şeffaflığı | Şemada `is_mock_fallback` + `fallback_reason` **zaten var**; `save_summary_metrics`'te "Fallback Durumu" sütunu **zaten var**. Ek `hata_durumu` alanı **gereksiz** — mevcut alanlar kullanılır. Sadece: her provider `except`'i `fallback_reason`'ı dolduruyor mu diye denetlenir (Anthropic/HF/Gemini/OpenAI → evet). | `schemas.py`, `report_writer.py` |
 | Trace mekanizması | `pipeline/llm_call.py`: her LLM çağrısını `{asama, model_id, girdi_karakter, sure_sn, basari, hata}` olarak `state.trace`'e ekler; `ReportWriter` bunu `outputs/.../trace.jsonl`'e yazar. | yeni + `report_writer.py` |
 | `reasoning_effort` → `max_tokens` | `BaseProvider.EFFORT_TOKEN_MAP` **zaten var** ama sadece token tavanına etki ediyor. Gemini `thinking_config`, OpenAI `o1/o3 reasoning_effort` uyguluyor; Anthropic/HF'de sözel etki yok (model desteklemiyor). Yapılacak: davranışı doküman + tabloya net yaz, kod tutarlılığı zaten mevcut. | `providers/base.py` |
@@ -251,34 +253,43 @@ prompts/
 
 ### Faz 3 — Map / Ensemble Çıkarım (`pipeline/nodes/map_extract.py`)
 
-- Orkestratör `gruplari_olustur` sonrası: `[Send("map_worker", {"grup": g, "model_id": m}) for g in gruplar for m in PIPELINE.map_models]`.
-- `map_worker(payload)` → `ProviderFactory.create_provider(...)` + `BaseProvider.analyze(prompt)`; prompt = `analyzer.CHUNK_INSTRUCTION` benzeri sarım + grup birleşik metni. Çıktı `BDRRiskAnalysisReport` → yalnızca `tespit_edilen_riskler` alınır.
+- Kullanılacak modeller: `state.secili_map_modelleri` (UI'dan) — boşsa `config.pipeline.map_models` (varsayılan ensemble). UI paneli config'deki listeyi ön-seçili gösterir, kullanıcı ekleyip çıkarabilir.
+- Orkestratör `gruplari_olustur` sonrası: `[Send("map_worker", {"grup": g, "model_id": m}) for g in gruplar for m in modeller]`.
+- `map_worker(payload)` → `ProviderFactory.create_provider(...)` + `BaseProvider.analyze(prompt)`; prompt = `analyzer.CHUNK_INSTRUCTION` benzeri sarım + grup birleşik metni. Çıktı `BDRRiskAnalysisReport` → yalnızca `tespit_edilen_riskler` alınır, her kaleme `kaynak_modeller=[model_id]` yazılır.
 - Sonuç `MapCiktisi` olarak `map_ciktilari`'ne (`operator.add`) yazılır. Hata → `hata_durumu` dolu, `riskler=[]` (grup bu model için boş, diğer modeller devam).
-- `PIPELINE.map_models` = 2-3 model (öneri: 1 güçlü kapalı + 1 güçlü açık + 1 Türkçe fine-tune).
-- **LLM çağrısı:** `G × M` (paralel), tipik 9-18.
+- Varsayılan ensemble = 2-3 model (öneri: 1 güçlü kapalı + 1 güçlü açık + 1 Türkçe fine-tune).
+- **LLM çağrısı:** `G × M` (paralel), tipik 9-18 (M = seçili model sayısı).
+
+### Faz 4-6 — Grup Alt-Grafı (`pipeline/group_graph.py`)
+
+Ana graf her grup için `Send("group_graph", GrupState(...))` yapar. `group_graph` ayrı
+derlenmiş bir `StateGraph`'tır: `ground → reconcile → critic → route_critic` (conditional:
+`reconcile`'e dön veya `grup_bitir`). `GrupState` = `{grup_id, birlesik_metin, ham_riskler,
+taslak_riskler, celiskiler, critic_tur}`. `grup_bitir` sonucu ana state'in
+`uzlastirilmis_riskler` / `celiskiler` / `critic_turlari` alanlarına (`operator.add`) yazar.
 
 ### Faz 4 — Grounding (`pipeline/grounding.py`) — LLM YOK
 
-- `grup_isle` içinde ilk adım. Her `BDRRiskItem.kaynak_metin_alintisi`, ait olduğu grubun `birlesik_metin`'inde `rapidfuzz.fuzz.partial_ratio` ile aranır.
+- `group_graph`'ın ilk node'u (`ground`). Her `BDRRiskItem.kaynak_metin_alintisi`, grubun `birlesik_metin`'inde `rapidfuzz.fuzz.partial_ratio` ile aranır.
 - `< PIPELINE.grounding_esigi` (öneri 85) → risk `dogrulanmadi=True` işaretlenir (yeni opsiyonel şema alanı, bkz. §7).
 - Nihai raporda `dogrulanmadi=True` kalemler "⚠️ kaynak doğrulanamadı" notuyla gösterilir (katı mod: `PIPELINE.grounding_katimod=True` ise elenir).
 - **LLM çağrısı:** 0.
 
 ### Faz 5 — Uzlaştırma (`pipeline/reconciler.py`)
 
-- `grup_isle` ikinci adım. Bir grup için `M` modelden gelen risk listeleri:
+- `group_graph`'ın `reconcile` node'u. Bir grup için `M` modelden gelen risk listeleri:
   1. **Mekanik ön-birleştirme:** `analyzer._dedupe_risks` (başlık) + `dedupe.uncovered_risks` mantığı (embedding/Jaccard) ile yakın kalemler kümelenir.
   2. **Reconciler LLM çağrısı:** `prompts/reconciler_v1.md` + kümelenmiş ham çıktılar → tek, en eksiksiz `List[BDRRiskItem]`. Çelişkiler (`risk_derecesi` farkı vb.) `celiskiler`'e not düşülür; **en ihtiyatlı değer** seçilir (Yüksek > Orta > Düşük; Kritik en üstte).
 - **LLM çağrısı:** grup başına 1.
 
 ### Faz 6 — Critic / Eksik Tarama (`pipeline/critic.py`)
 
-- `grup_isle` üçüncü adım. **Girdi:** uzlaştırılmış taslak + grubun **orijinal tam metni**.
+- `group_graph`'ın `critic` node'u. **Girdi:** uzlaştırılmış taslak + grubun **orijinal tam metni**.
 - Ön-filtre: `dedupe.uncovered_risks(map_ham_riskleri, taslak)` — hangi ham riskler taslakta yok? Bu liste critic prompt'una "özellikle şunlara bak" ipucu olarak verilir (LLM'i yönlendirir, kör aramadan iyi).
 - **Critic LLM çağrısı:** `prompts/critic_v1.md`: *"Taslakta eksik/gözden kaçmış risk unsuru var mı? Varsa `BDRRiskItem` olarak ekle."*
-- Eksik bulundu **ve** `critic_tur < PIPELINE.max_critic_turu` (öneri 2) → conditional edge ile Faz 5'e (reconcile) geri dön; yoksa devam.
+- **LangGraph graph cycle:** `critic` node'undan `route_critic` conditional edge → eksik bulundu **ve** `critic_tur < PIPELINE.max_critic_turu` (öneri 2) ise `reconcile` node'una dön; yoksa `grup_bitir`. Her tur checkpoint'lenir (resume bir critic turunun ortasından devam edebilir).
 - `critic_turlari`'ne `{grup_id, tur, eklenen_sayi}` yazılır.
-- Grup bitince `uzlastirilmis_riskler`'e (`operator.add`) yazılır.
+- `route_critic` conditional edge: `eksik_var and critic_tur < max_critic_turu` → `reconcile` (cycle); değilse → `grup_bitir` → ana state'e `operator.add`.
 - **LLM çağrısı:** grup başına 1 + (döngü sayısı × 1 reconcile + 1 critic), tipik grup başına 2-3.
 
 ### Faz 7 — Sentez (`pipeline/nodes/synthesis.py`)
@@ -301,8 +312,8 @@ prompts/
 ### Faz 9 — Batch (`pipeline/batch.py`, `run_poc.py --batch`)
 
 - `run_poc.py --batch <klasör>`: klasördeki her `.txt` için `graph.invoke(state, config={"configurable": {"thread_id": bdr_id}})`.
-- Checkpointer: dev `MemorySaver`; batch `SqliteSaver` (`outputs/pipeline_checkpoints.sqlite`). **Postgres yerine SQLite** — tek makine, kurulum yok; gerçekten dağıtık ölçekte Postgres'e geçilir.
-- Hata → o `thread_id` başarısız node'dan devam edebilir (`graph.invoke` tekrar çağrısı).
+- Checkpointer: **`PostgresSaver`** (`PIPELINE_DB_URL`, `.env`). Birim testlerde `MemorySaver`. Yerel Postgres Docker ile (`docker compose` girişi Faz 0'da eklenir).
+- Hata → o `thread_id` başarısız node'dan devam edebilir (`graph.invoke` tekrar çağrısı). Graph cycle sayesinde bir critic turunun ortasından bile devam edilebilir.
 - `outputs/<tarih>/<saat>/<bdr_adi>/` hiyerarşisi korunur.
 - **Portföy özeti:** `outputs/<tarih>/<saat>/portfoy_ozeti.md` — firma, karar eğilimi, risk sayısı, QA bayrakları, kullanılan model ensemble'ı, maliyet.
 
@@ -362,7 +373,10 @@ class BDRRiskAnalysisReport(BaseModel):
 }
 ```
 
-`config.py`: `Config.get_pipeline_config()` — blok + varsayılanlar.
+- `map_models` = **varsayılan** ensemble. UI'daki "Pipeline" panelinde bu liste ön-seçili gelir; kullanıcı çalıştırma başına ekleyip çıkarabilir → `state.secili_map_modelleri`. `run_poc.py --batch` varsayılanı kullanır (`--map-models a,b,c` ile ezilebilir).
+- Diğer roller (triage/reconciler/critic/synthesis) config'de sabit — benchmark tutarlılığı için UI'dan değiştirilmez.
+- `config.py`: `Config.get_pipeline_config()` — blok + varsayılanlar.
+- `.env`: `PIPELINE_DB_URL=postgresql://finside:finside@localhost:5432/finside_pipeline`
 
 ---
 
@@ -399,14 +413,16 @@ Batch ×50 BDR → **25-45M token**. → Geliştirme `MockProvider` ile; gerçek
 
 ---
 
-## 11. Açık Karar Noktaları
+## 11. Kararlar (çözüldü — 1 Eylül 2026)
 
-1. **`map_models` sabit mi, UI'dan seçilebilir mi?** Öneri: config'de sabit "ensemble", UI'da yalnızca göster (benchmark tekrarlanabilirliği).
-2. **Critic döngüsü:** graph cycle (plana uygun) — onaylanıyor mu, yoksa node-içi bounded loop mu (daha basit, checkpoint daha az)?
-3. **Legacy `BDRAnalyzer`:** kalsın (iki yol) — onay? Yoksa pipeline'ın ince wrapper'ı mı olsun?
-4. **Checkpointer:** dev `MemorySaver` + batch `SqliteSaver` yeterli mi (Postgres istenmiyor)?
-5. **`app.py` entegrasyonu:** pipeline'ı Streamlit'te ayrı thread'de mi çalıştıralım (UI donmasın)? LangGraph sync `invoke` uzun sürer.
-6. **LangGraph + rapidfuzz sürümleri:** Faz 0'da `requirements.txt`'e pinlenecek — kurulum onayı ayrıca istenir.
+| # | Konu | Karar |
+|---|---|---|
+| 1 | Ensemble map modelleri | **UI'dan seçilebilir.** config `pipeline.map_models` varsayılan; `state.secili_map_modelleri` ezer. Diğer roller config'de sabit. |
+| 2 | Critic döngüsü | **LangGraph graph cycle.** `group_graph` subgraph'ında `reconcile ⇄ critic`, `route_critic` conditional + `max_critic_turu` koruması. |
+| 3 | Legacy `BDRAnalyzer` | **İki yol paralel yaşar.** `analyzer.py` mevcut UI/CLI "hızlı tek model" analizi için kalır; pipeline ayrı `pipeline/` paketi. |
+| 4 | Checkpointer | **`PostgresSaver` baştan.** `PIPELINE_DB_URL` (.env), yerel Postgres Docker ile. Birim testlerde `MemorySaver`. |
+| 5 | `app.py` entegrasyonu | Pipeline Streamlit'te ayrı thread'de (`ThreadPoolExecutor`), `graph.stream(stream_mode="updates")` kuyruğa yazar, UI kuyruğu okur — UI donmaz. |
+| 6 | Bağımlılık sürümleri | Faz 0'da `requirements.txt`'e pinlenir; paket kurulumu + Postgres kurulumu ayrı onayla. |
 
 ---
 
