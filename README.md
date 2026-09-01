@@ -30,7 +30,7 @@ Modellerin çıktı uzunluğu ve derin muhakeme (reasoning effort) tavanı `conf
 - **Google Gemini (3.6 Flash / 3.1 Pro)**: `16,384 max_tokens` + `high reasoning_effort`
 - **OpenAI (GPT-4o, GPT-4o-mini, o3-mini)**: `8,192 – 16,384 max_tokens` + `high reasoning_effort`
 - **Anthropic (Claude Sonnet 4.5)**: `32,000 max_tokens` (forced tool-use + streaming)
-- **Açık Kaynak Lider Modeller (Qwen 72B, Llama 3.3 70B, Qwen3 32B, Gemma 3 27B, DeepSeek V3)**: `8,192 max_tokens`
+- **Açık Ağırlık Modeller (GPT-OSS 120B, Qwen2.5 72B, Llama 3.3 70B, Qwen3 32B, Gemma 3 27B, DeepSeek V3)**: `8,192 max_tokens`, HuggingFace serverless router üzerinden
 
 Girdi tarafında chunking eşiği sağlayıcıya göre değişir (`analyzer.PROVIDER_INPUT_LIMITS`:
 HF 90K, bulut 200K karakter); `config.json` içinde `max_input_chars` ile ezilebilir.

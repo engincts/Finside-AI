@@ -4,6 +4,24 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B
+
+### Değişen
+
+- **`config.json` model adları sadeleştirildi.** Benchmark skoru / pazarlama ifadeleri
+  (`(TR-MMLU Lideri %77.28)`, `(CETVEL 2026 Türkçe #1)`, `(Amiral Gemisi)`,
+  `(10K TPM Yüksek Kapasite)` vb.) kaldırıldı; net model adları bırakıldı
+  (`Qwen2.5 72B Instruct`, `Llama 3.3 70B Instruct`, `OpenAI GPT-4o` …).
+- `claude-3-5-sonnet` id'si → `claude-sonnet-4-5` (önceki oturumdan).
+
+### Eklenen
+
+- **`gpt-oss-120b`** modeli — OpenAI'nin açık ağırlıklı MoE modeli, HuggingFace
+  serverless router üzerinden (`openai/gpt-oss-120b`, `provider: huggingface`).
+  `max_input_chars: 200000`, `enabled: true`.
+
+---
+
 ## 2026-09-01 — Provider dayanıklılığı, yapısal chunking, paralel çalıştırma
 
 **Commit:** `c7ba3af` (dal: `Development`)

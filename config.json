@@ -36,7 +36,7 @@
     },
     {
       "id": "gpt-4o-mini",
-      "name": "OpenAI GPT-4o-mini (Hızlı & 200K TPM Yüksek Kapasite)",
+      "name": "OpenAI GPT-4o mini",
       "provider": "openai",
       "model_name": "gpt-4o-mini",
       "api_key_env": "OPENAI_API_KEY",
@@ -49,7 +49,7 @@
     },
     {
       "id": "gpt-4o",
-      "name": "OpenAI GPT-4o (Amiral Gemisi)",
+      "name": "OpenAI GPT-4o",
       "provider": "openai",
       "model_name": "gpt-4o",
       "api_key_env": "OPENAI_API_KEY",
@@ -62,7 +62,7 @@
     },
     {
       "id": "o3-mini",
-      "name": "OpenAI o3-mini (Derin Muhakeme)",
+      "name": "OpenAI o3-mini",
       "provider": "openai",
       "model_name": "o3-mini",
       "api_key_env": "OPENAI_API_KEY",
@@ -85,8 +85,23 @@
       "enabled": false
     },
     {
+      "id": "gpt-oss-120b",
+      "name": "OpenAI GPT-OSS 120B",
+      "provider": "huggingface",
+      "model_name": "openai/gpt-oss-120b",
+      "api_key_env": "HF_TOKEN",
+      "reasoning_effort": "high",
+      "max_tokens": 8192,
+      "temperature": 0.1,
+      "top_p": 0.9,
+      "repetition_penalty": 1.05,
+      "max_input_chars": 200000,
+      "prompt_file": "bdr_analyst_v1.md",
+      "enabled": true
+    },
+    {
       "id": "hf-qwen-2.5-72b",
-      "name": "HuggingFace Qwen2.5-72B (TR-MMLU Lideri %77.28)",
+      "name": "Qwen2.5 72B Instruct",
       "provider": "huggingface",
       "model_name": "Qwen/Qwen2.5-72B-Instruct",
       "api_key_env": "HF_TOKEN",
@@ -100,7 +115,7 @@
     },
     {
       "id": "hf-llama-3.3-70b",
-      "name": "HuggingFace Llama-3.3-70B (CETVEL 2026 Türkçe #1)",
+      "name": "Llama 3.3 70B Instruct",
       "provider": "huggingface",
       "model_name": "meta-llama/Llama-3.3-70B-Instruct",
       "api_key_env": "HF_TOKEN",
@@ -114,7 +129,7 @@
     },
     {
       "id": "hf-qwen-3-32b",
-      "name": "HuggingFace Qwen3-32B (On-Prem Muhakeme Lideri)",
+      "name": "Qwen3 32B Instruct",
       "provider": "huggingface",
       "model_name": "Qwen/Qwen3-32B-Instruct",
       "api_key_env": "HF_TOKEN",
@@ -128,7 +143,7 @@
     },
     {
       "id": "hf-gemma-3-27b",
-      "name": "HuggingFace Gemma-3-27B (Google Türkçe Lideri %70.20)",
+      "name": "Gemma 3 27B Instruct",
       "provider": "huggingface",
       "model_name": "google/gemma-3-27b-it",
       "api_key_env": "HF_TOKEN",
@@ -142,7 +157,7 @@
     },
     {
       "id": "hf-gemma-3-12b",
-      "name": "HuggingFace Gemma-3-12B (Orta Boy On-Prem %63.92)",
+      "name": "Gemma 3 12B Instruct",
       "provider": "huggingface",
       "model_name": "google/gemma-3-12b-it",
       "api_key_env": "HF_TOKEN",
@@ -156,7 +171,7 @@
     },
     {
       "id": "hf-mistral-small-24b",
-      "name": "HuggingFace Mistral-Small-24B (Apache 2.0 / 128K)",
+      "name": "Mistral Small 24B Instruct",
       "provider": "huggingface",
       "model_name": "mistralai/Mistral-Small-24B-Instruct-2501",
       "api_key_env": "HF_TOKEN",
@@ -170,7 +185,7 @@
     },
     {
       "id": "hf-deepseek-v3",
-      "name": "HuggingFace DeepSeek-V3 (671B MoE)",
+      "name": "DeepSeek V3",
       "provider": "huggingface",
       "model_name": "deepseek-ai/DeepSeek-V3",
       "api_key_env": "HF_TOKEN",
@@ -184,7 +199,7 @@
     },
     {
       "id": "hf-fin-r1-7b",
-      "name": "HuggingFace Fin-R1 (Finansal RL Muhakeme)",
+      "name": "Fin-R1 7B",
       "provider": "huggingface",
       "model_name": "SUFE-AIF/Fin-R1-7B",
       "api_key_env": "HF_TOKEN",
@@ -198,7 +213,7 @@
     },
     {
       "id": "hf-qwen-2.5-7b",
-      "name": "HuggingFace Qwen2.5-7B (Açık Kaynak API)",
+      "name": "Qwen2.5 7B Instruct",
       "provider": "huggingface",
       "model_name": "Qwen/Qwen2.5-7B-Instruct",
       "api_key_env": "HF_TOKEN",
@@ -212,7 +227,7 @@
     },
     {
       "id": "hf-commencis-llm",
-      "name": "HuggingFace Commencis-LLM (Türkçe LLM)",
+      "name": "Commencis LLM (Türkçe)",
       "provider": "huggingface",
       "model_name": "Commencis/Commencis-LLM",
       "api_key_env": "HF_TOKEN",
@@ -226,7 +241,7 @@
     },
     {
       "id": "hf-mihenk-financial-14b",
-      "name": "HuggingFace Mihenk-LLM-14B (Türkçe Finansal Model v1)",
+      "name": "Mihenk LLM 14B (Türkçe Finansal)",
       "provider": "huggingface",
       "model_name": "AlicanKiraz0/Mihenk-LLM-14B-Turkish-Financial-Model",
       "api_key_env": "HF_TOKEN",
@@ -240,7 +255,7 @@
     },
     {
       "id": "hf-mihenk-financial-35b",
-      "name": "HuggingFace Mihenk-LLM-v2-35B (Türkçe Finansal Model v2)",
+      "name": "Mihenk LLM v2 35B (Türkçe Finansal)",
       "provider": "huggingface",
       "model_name": "AlicanKiraz0/Mihenk-LLM-v2-35B-A3B-Turkish-Financial-Model",
       "api_key_env": "HF_TOKEN",

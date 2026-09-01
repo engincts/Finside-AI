@@ -41,6 +41,7 @@
 
 | Model | Model Tipi | Bağlam | TR-MMLU Skoru | CETVEL Derecesi | Lisans | On-Prem Donanım Gereksinimi |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **GPT-OSS-120B** | Açık Ağırlık (MoE, ~5.1B aktif) | 128K | - | Test / Yeni | **Apache 2.0** | 1× 80GB GPU (MXFP4) / HF Serverless |
 | **Qwen2.5-72B-Instruct** | Açık Kaynak | 128K | **%77.28 (#1)** | Üst Segment | Qwen License | 2× A100 (80GB) / 48GB+ VRAM |
 | **Llama-3.3-70B-Instruct** | Açık Ağırlık | 128K | %74.00 | **Genel #1** | Llama Community | 2× A100 (80GB) / 40GB+ VRAM |
 | **Qwen3-32B-Instruct** | Açık Kaynak | 128K | High (Est.) | Yüksek | **Apache 2.0** | Tek A100 80GB / 2×24GB GPU |
