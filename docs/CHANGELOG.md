@@ -4,6 +4,17 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-01 — Model fiyatları (`config.json`)
+
+- Tüm 20 modele `usd_1k_in` / `usd_1k_out` (1K token başına USD) eklendi. Artık
+  `pipeline/nodes/cost.py` `maliyet_ozetle` gerçek `tahmini_usd` hesaplayabiliyor
+  (önceden hep 0 idi, fiyat alanı yoktu).
+- **Rakamlar kamuya açık liste fiyatlarından yaklaşık tahmindir** — gerçek fatura ile
+  karşılaştırıp güncellenmeli, özellikle HF serverless açık kaynak modeller (barındıran
+  sağlayıcıya göre değişir) ve Gemini 3.x / Claude Sonnet 4.5 gibi yeni sürümler.
+
+---
+
 ## 2026-09-01 — Benchmark hızı + iki mod dokümantasyonu
 
 - **`app.py`:** kıyas panelinde `truncate` denemesi geri alındı — tam yapı-farkında

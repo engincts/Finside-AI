@@ -29,6 +29,8 @@
       "api_key_env": "",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.0,
+      "usd_1k_out": 0.0,
       "enabled": false
     },
     {
@@ -42,6 +44,8 @@
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00015,
+      "usd_1k_out": 0.0006,
       "enabled": true
     },
     {
@@ -55,6 +59,8 @@
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00125,
+      "usd_1k_out": 0.01,
       "enabled": false
     },
     {
@@ -68,6 +74,8 @@
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00015,
+      "usd_1k_out": 0.0006,
       "enabled": false
     },
     {
@@ -81,6 +89,8 @@
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.0025,
+      "usd_1k_out": 0.01,
       "enabled": false
     },
     {
@@ -92,6 +102,8 @@
       "reasoning_effort": "high",
       "max_tokens": 16384,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.0011,
+      "usd_1k_out": 0.0044,
       "enabled": false
     },
     {
@@ -105,6 +117,8 @@
       "temperature": 0.1,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.003,
+      "usd_1k_out": 0.015,
       "enabled": false
     },
     {
@@ -120,6 +134,8 @@
       "repetition_penalty": 1.05,
       "max_input_chars": 200000,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.0001,
+      "usd_1k_out": 0.0004,
       "enabled": true
     },
     {
@@ -134,6 +150,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00013,
+      "usd_1k_out": 0.0004,
       "enabled": false
     },
     {
@@ -148,6 +166,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00013,
+      "usd_1k_out": 0.0004,
       "enabled": false
     },
     {
@@ -162,6 +182,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00006,
+      "usd_1k_out": 0.0002,
       "enabled": false
     },
     {
@@ -176,6 +198,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00006,
+      "usd_1k_out": 0.0002,
       "enabled": false
     },
     {
@@ -190,6 +214,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00003,
+      "usd_1k_out": 0.0001,
       "enabled": false
     },
     {
@@ -204,6 +230,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00006,
+      "usd_1k_out": 0.0002,
       "enabled": false
     },
     {
@@ -218,6 +246,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00027,
+      "usd_1k_out": 0.0011,
       "enabled": false
     },
     {
@@ -232,6 +262,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00002,
+      "usd_1k_out": 0.00006,
       "enabled": false
     },
     {
@@ -246,6 +278,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00002,
+      "usd_1k_out": 0.00006,
       "enabled": true
     },
     {
@@ -260,6 +294,8 @@
       "reasoning_effort": "medium",
       "max_tokens": 4096,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00002,
+      "usd_1k_out": 0.00006,
       "enabled": false
     },
     {
@@ -274,6 +310,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00003,
+      "usd_1k_out": 0.0001,
       "enabled": false
     },
     {
@@ -288,6 +326,8 @@
       "reasoning_effort": "high",
       "max_tokens": 8192,
       "prompt_file": "bdr_analyst_v1.md",
+      "usd_1k_in": 0.00006,
+      "usd_1k_out": 0.0002,
       "enabled": false
     }
   ]
