@@ -314,28 +314,29 @@ with tab_overview:
 with tab_reports:
     if st.session_state.analysis_results:
         st.subheader("🤖 Model Çıktı Raporları")
-        
+
         results = st.session_state.analysis_results
-        st.caption("Detaylı raporu görmek için ilgili modelin başlığına tıklayın.")
+        model_tabs = st.tabs([
+            f"{r['model_name']}{' ⚠️' if r['report'].is_mock_fallback else ''}"
+            for r in results
+        ])
 
-        for r in results:
-            report = r["report"]
-            gorus = report.denetci_gorusu.value if report.denetci_gorusu else "Belirtilmemiş"
-            fallback_mark = " ⚠️ Mock" if report.is_mock_fallback else ""
-            label = f"{r['model_name']} — {report.karar_egilimi.value}{fallback_mark}"
+        for idx, r in enumerate(results):
+            with model_tabs[idx]:
+                report = r["report"]
+                gorus = report.denetci_gorusu.value if report.denetci_gorusu else "Belirtilmemiş"
 
-            with st.expander(label, expanded=False):
                 if report.is_mock_fallback:
                     st.warning(f"⚠️ **Mock Fallback Uyarısı**: Gerçek API hatası nedeniyle simülasyon raporu gösterilmektedir. (Hata: {report.fallback_reason})")
 
-                # Key Rapor Kartları
                 c1, c2, c3 = st.columns(3)
                 c1.info(f"**Firma:** {report.firma_adi}")
                 c2.success(f"**Denetçi Görüşü:** {gorus}")
                 c3.warning(f"**Karar Eğilimi:** {report.karar_egilimi.value}")
 
                 st.markdown("---")
-                st.markdown(r["md_content"])
+                with st.container(height=600):
+                    st.markdown(r["md_content"])
     else:
         st.info("👈 Henüz bir analiz çalıştırılmadı. Sol menüden **🚀 ANALİZİ BAŞLAT** butonuna tıklayabilirsiniz.")
 
@@ -395,16 +396,16 @@ with tab_input:
         mime="text/plain",
     )
 
+    gosterilecek = bdr_content
     if len(bdr_content) > BDR_PREVIEW_CHARS:
-        st.info(
-            f"Tarayıcı performansı için ilk {BDR_PREVIEW_CHARS:,} karakter gösteriliyor. "
-            "Tamamı için indirme butonunu kullanın."
+        st.caption(
+            f"Tarayıcı performansı için ilk {BDR_PREVIEW_CHARS:,} karakter kaydırmalı kutuda "
+            "gösteriliyor. Tamamı için indirme butonunu kullanın."
         )
-        st.text(bdr_content[:BDR_PREVIEW_CHARS])
-        with st.expander("Tam metni yine de göster (tarayıcıyı yavaşlatabilir)"):
-            st.text(bdr_content)
-    else:
-        st.text(bdr_content)
+        gosterilecek = bdr_content[:BDR_PREVIEW_CHARS]
+
+    with st.container(height=560):
+        st.text(gosterilecek)
 
 # TAB 5: MULTI-AGENT PIPELINE (Faz 9.6)
 FAZ_ETIKETLERI = {
