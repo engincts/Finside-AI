@@ -61,6 +61,24 @@ kural=12 / llm=41, 8 segment grubu (hepsi ≤ 88K karakter). **Batch resume test
 `triyaj_yap`'ta simüle hata → `invoke(None)` ile checkpoint'ten devam, `segmentle`
 yeniden çalışmadı. Canlı API çağrısı yapılmadı.
 
+### Faz 3 — Map / Ensemble Çıkarım
+
+- **`pipeline/nodes/map_extract.py`** (yeni):
+  - `map_dagit` — `gruplari_olustur` sonrası fan-out: her (grup × model) çifti için `Send("map_worker", …)`.
+  - `map_worker` — `rapor_cagrisi` ile grup metnini analiz eder, yalnızca
+    `tespit_edilen_riskler`'i alır, her kaleme `kaynak_modeller=[model_id]` yazar.
+    `model_dump(mode="json")` ile enum→string (checkpoint-güvenli). Bir modelin çökmesi
+    izole edilir (`hata_durumu` dolu, `riskler=[]`), diğerleri devam eder.
+  - `map_topla` — join node: `map_raw.json` + tüm birikmiş trace'i `trace.jsonl`'e yazar.
+- **Modeller:** `state.secili_map_modelleri` (UI) → yoksa `config.pipeline.map_models`.
+- **`graph.py`:** `… → gruplari_olustur ─(Send: grup×model)→ map_worker → map_topla → END`.
+- **`report_writer.py`:** `save_trace` (üzerine yazan, tekrarsız); trace artık node
+  başına değil `map_topla`'da tek seferde yazılıyor.
+
+Doğrulama (mock): 8 grup × 1 model = 8 map çıktısı, 24 ham risk; 8 grup × 2 model (biri
+geçersiz id) = 16 çıktı, 8 başarılı + 8 izole hata, graph tamamlandı; checkpoint
+serileştirme uyarısız.
+
 ---
 
 ## 2026-09-01 — Model kataloğu temizliği + GPT-OSS 120B

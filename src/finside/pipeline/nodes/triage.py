@@ -62,10 +62,7 @@ def triyaj_yap(state: PipelineState) -> dict:
     kararlar.sort(key=lambda k: k["segment_sira_no"])
     dahil_nolar = [k["segment_sira_no"] for k in kararlar if k["dahil"]]
 
-    session_dir = Path(state["session_dir"])
-    ReportWriter.save_json(session_dir, "triage_log.json", kararlar)
-    if izler:
-        ReportWriter.append_trace(session_dir, [dict(t) for t in izler])
+    ReportWriter.save_json(Path(state["session_dir"]), "triage_log.json", kararlar)
 
     return {
         "triaj_kararlari": kararlar,

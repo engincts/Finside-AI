@@ -46,6 +46,14 @@ class ReportWriter:
                 f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
 
     @classmethod
+    def save_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+        """Birikmiş tüm trace kayıtlarını `trace.jsonl`'e yazar (üzerine, tekrarsız)."""
+        trace_path = session_dir / "trace.jsonl"
+        with open(trace_path, "w", encoding="utf-8") as f:
+            for kayit in kayitlar:
+                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+
+    @classmethod
     def save_summary_metrics(cls, session_dir: Path, bdr_name: str, metrics_list: List[Dict[str, Any]]):
         summary_json_path = session_dir / "summary_metrics.json"
         summary_md_path = session_dir / "summary_metrics.md"

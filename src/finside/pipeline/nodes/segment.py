@@ -24,8 +24,6 @@ def segmentle(state: PipelineState) -> dict:
             for s in sonuc.segmentler
         ],
     })
-    if sonuc.izler:
-        ReportWriter.append_trace(session_dir, [dict(t) for t in sonuc.izler])
 
     return {
         "segmentler": sonuc.segmentler,
