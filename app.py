@@ -31,9 +31,11 @@ if sys.platform == "win32":
 
 import streamlit as st
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 
 MAX_PARALLEL_MODELS = 8
+BDR_PREVIEW_CHARS = 20000
+BENCHMARK_MAX_WAIT_SEC = 600  # bu süreyi aşan modeller "zaman aşımı" olarak işaretlenir
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -185,7 +187,10 @@ config_data = Config.load_config()
 all_models = config_data.get("models", [])
 
 selected_model_ids = []
-st.sidebar.caption("Analize Dahil Etmek İstediğiniz Modelleri Seçin:")
+st.sidebar.caption(
+    "Bu ayarlar (mod, model, parametreler) yalnızca **📊 Karşılaştırma Paneli** "
+    "tek-model kıyaslaması içindir. 🔗 Multi-Agent Pipeline sekmesi bağımsız çalışır."
+)
 
 for m in all_models:
     model_id = m.get("id")
@@ -211,11 +216,12 @@ except TypeError:
     run_analysis_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
 
 # MAIN BODY TABS
-tab_overview, tab_reports, tab_prompt, tab_input = st.tabs([
-    "📊 Karşılaştırma Paneli", 
-    "🤖 Model Çıktı Raporları", 
-    "📝 Canlı Prompt Düzenleyici", 
-    "📄 BDR Metin Görünümü"
+tab_overview, tab_reports, tab_prompt, tab_input, tab_pipeline = st.tabs([
+    "📊 Karşılaştırma Paneli",
+    "🤖 Model Çıktı Raporları",
+    "📝 Canlı Prompt Düzenleyici",
+    "📄 BDR Metin Görünümü",
+    "🔗 Multi-Agent Pipeline"
 ])
 
 # SESSION STATE STORAGE FOR RESULTS
@@ -237,33 +243,40 @@ if run_analysis_btn and selected_model_ids:
         active_user_template = st.session_state.active_user_template
 
         outputs = {}
-        with ThreadPoolExecutor(max_workers=min(len(selected_model_ids), MAX_PARALLEL_MODELS)) as executor:
-            futures = {
-                executor.submit(
-                    run_model_analysis,
-                    m_id,
-                    all_models,
-                    config_data,
-                    is_mock_mode,
-                    hyperparams,
-                    active_system_prompt,
-                    active_user_template,
-                    bdr_content,
-                    session_dir,
-                ): m_id
-                for m_id in selected_model_ids
-            }
-            for future in as_completed(futures):
-                outputs[futures[future]] = future.result()
+        executor = ThreadPoolExecutor(max_workers=min(len(selected_model_ids), MAX_PARALLEL_MODELS))
+        futures = {
+            executor.submit(
+                run_model_analysis,
+                m_id, all_models, config_data, is_mock_mode, hyperparams,
+                active_system_prompt, active_user_template, bdr_content, session_dir,
+            ): m_id
+            for m_id in selected_model_ids
+        }
+        done, not_done = futures_wait(futures, timeout=BENCHMARK_MAX_WAIT_SEC)
+        for future in done:
+            outputs[futures[future]] = future.result()
+        zaman_asimi = [futures[f] for f in not_done]
+        for future in not_done:
+            future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
 
-        results_list = [outputs[m_id]["result"] for m_id in selected_model_ids]
-        metrics_summary_list = [outputs[m_id]["metrics"] for m_id in selected_model_ids]
+        if zaman_asimi:
+            st.warning(
+                f"⏱️ {len(zaman_asimi)} model {BENCHMARK_MAX_WAIT_SEC} sn içinde tamamlanamadı ve "
+                f"atlandı: {', '.join(zaman_asimi)}"
+            )
 
-        # Save summary metrics report
-        ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
-        st.session_state.analysis_results = results_list
-        st.session_state.metrics_summary = metrics_summary_list
-        st.success(f"✅ Analiz Başarıyla Tamamlandı! Raporlar kaydedildi: `{session_dir}`")
+        tamamlanan = [m_id for m_id in selected_model_ids if m_id in outputs]
+        results_list = [outputs[m_id]["result"] for m_id in tamamlanan]
+        metrics_summary_list = [outputs[m_id]["metrics"] for m_id in tamamlanan]
+
+        if not results_list:
+            st.error("❌ Hiçbir model zamanında tamamlanamadı. Daha hızlı model seçin veya süreyi artırın.")
+        else:
+            ReportWriter.save_summary_metrics(session_dir, input_stem, metrics_summary_list)
+            st.session_state.analysis_results = results_list
+            st.session_state.metrics_summary = metrics_summary_list
+            st.success(f"✅ Analiz Tamamlandı ({len(results_list)}/{len(selected_model_ids)} model). Raporlar: `{session_dir}`")
 
 # TAB 1: EXECUTIVE SUMMARY & METRICS COMPARISON
 with tab_overview:
@@ -309,25 +322,29 @@ with tab_overview:
 with tab_reports:
     if st.session_state.analysis_results:
         st.subheader("🤖 Model Çıktı Raporları")
-        
+
         results = st.session_state.analysis_results
-        model_tabs = st.tabs([r["model_name"] for r in results])
+        model_tabs = st.tabs([
+            f"{r['model_name']}{' ⚠️' if r['report'].is_mock_fallback else ''}"
+            for r in results
+        ])
 
         for idx, r in enumerate(results):
             with model_tabs[idx]:
                 report = r["report"]
-                
+                gorus = report.denetci_gorusu.value if report.denetci_gorusu else "Belirtilmemiş"
+
                 if report.is_mock_fallback:
                     st.warning(f"⚠️ **Mock Fallback Uyarısı**: Gerçek API hatası nedeniyle simülasyon raporu gösterilmektedir. (Hata: {report.fallback_reason})")
 
-                # Key Rapor Kartları
                 c1, c2, c3 = st.columns(3)
                 c1.info(f"**Firma:** {report.firma_adi}")
-                c2.success(f"**Denetçi Görüşü:** {report.denetci_gorusu.value if report.denetci_gorusu else 'Belirtilmemiş'}")
+                c2.success(f"**Denetçi Görüşü:** {gorus}")
                 c3.warning(f"**Karar Eğilimi:** {report.karar_egilimi.value}")
 
                 st.markdown("---")
-                st.markdown(r["md_content"])
+                with st.container(height=600):
+                    st.markdown(r["md_content"])
     else:
         st.info("👈 Henüz bir analiz çalıştırılmadı. Sol menüden **🚀 ANALİZİ BAŞLAT** butonuna tıklayabilirsiniz.")
 
@@ -378,5 +395,131 @@ with tab_prompt:
 # TAB 4: RAW BDR INPUT TEXT VIEWER
 with tab_input:
     st.subheader(f"📄 İşlenen BDR Dosya İçeriği: `{bdr_name}`")
-    st.caption(f"Karakter Sayısı: {len(bdr_content)} | Kelime Sayısı: {len(bdr_content.split())}")
-    st.text_area("BDR Ham Metni", bdr_content, height=500)
+    st.caption(f"Karakter Sayısı: {len(bdr_content):,} | Kelime Sayısı: {len(bdr_content.split()):,}")
+
+    st.download_button(
+        "⬇️ Tam BDR Metnini İndir (.txt)",
+        data=bdr_content,
+        file_name=bdr_name,
+        mime="text/plain",
+    )
+
+    gosterilecek = bdr_content
+    if len(bdr_content) > BDR_PREVIEW_CHARS:
+        st.caption(
+            f"Tarayıcı performansı için ilk {BDR_PREVIEW_CHARS:,} karakter kaydırmalı kutuda "
+            "gösteriliyor. Tamamı için indirme butonunu kullanın."
+        )
+        gosterilecek = bdr_content[:BDR_PREVIEW_CHARS]
+
+    with st.container(height=560):
+        st.text(gosterilecek)
+
+# TAB 5: MULTI-AGENT PIPELINE (Faz 9.6)
+FAZ_ETIKETLERI = {
+    "segmentle": "1 · Segmentasyon",
+    "triyaj_yap": "2 · Triyaj",
+    "gruplari_olustur": "2 · Gruplama",
+    "map_worker": "3 · Ensemble Map çıkarımı",
+    "map_topla": "3 · Map birleştirme",
+    "grup_isle": "4-6 · Grounding + Uzlaştırma + Critic",
+    "sentezle": "7 · Sentez",
+    "qa_kontrol": "8 · Tutarlılık QA",
+    "maliyet_ozetle": "10 · Maliyet özeti",
+}
+
+if "pipeline_sonucu" not in st.session_state:
+    st.session_state.pipeline_sonucu = None
+
+with tab_pipeline:
+    st.subheader("🔗 Multi-Agent BDR Analiz Pipeline")
+    st.caption(
+        "Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA. "
+        "Tasarım: `docs/PIPELINE_DESIGN.md`"
+    )
+    st.warning(
+        "Bu sekme **Karşılaştırma Paneli'nden tamamen bağımsızdır** — soldaki mod / model / "
+        "parametre ayarları burada geçerli değildir. Pipeline BDR başına **20-45 LLM çağrısı** "
+        "(~500K-900K token) yapar. Önce Karşılaştırma Paneli'nde modelleri kıyaslayıp en iyi "
+        "2-3'ünü aşağıya ensemble olarak seçin, sonra çalıştırın."
+    )
+
+    pipeline_cfg = config_data.get("pipeline", {})
+    model_secenekleri = [m.get("id") for m in all_models]
+    varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
+    secili_ensemble = st.multiselect(
+        "Ensemble Map Modelleri (segment grubu başına paralel çalışır)",
+        options=model_secenekleri,
+        default=varsayilan_ensemble or model_secenekleri[:1],
+    )
+    maliyet_onay = st.checkbox("Yüksek token maliyetini anladım, pipeline'ı çalıştır")
+
+    try:
+        pipeline_btn = st.button(
+            "🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not maliyet_onay
+        )
+    except TypeError:
+        pipeline_btn = st.button(
+            "🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not maliyet_onay
+        )
+
+    if pipeline_btn and not secili_ensemble:
+        st.warning("⚠️ En az bir ensemble modeli seçiniz.")
+    elif pipeline_btn:
+        from langgraph.checkpoint.memory import MemorySaver
+        from finside.pipeline.graph import build_graph
+
+        pipe_session_dir, _ = ReportWriter.create_session_directory(bdr_name)
+        pipe_graph = build_graph(checkpointer=MemorySaver())
+        pipe_baslangic = {
+            "bdr_id": bdr_name,
+            "bdr_adi": bdr_name,
+            "ham_metin": bdr_content,
+            "session_dir": str(pipe_session_dir),
+            "secili_map_modelleri": secili_ensemble,
+        }
+        pipe_cfg_run = {"configurable": {"thread_id": bdr_name}, "recursion_limit": 150}
+
+        durum_alani = st.empty()
+        yapilan = set()
+        son_guncelleme = {}
+        with st.spinner("🔗 Pipeline çalışıyor…"):
+            for adim in pipe_graph.stream(pipe_baslangic, config=pipe_cfg_run, stream_mode="updates"):
+                for node, guncelleme in adim.items():
+                    yapilan.add(node)
+                    if guncelleme:
+                        son_guncelleme[node] = guncelleme
+                with durum_alani.container():
+                    for node, etiket in FAZ_ETIKETLERI.items():
+                        st.write(("✅ " if node in yapilan else "⏳ ") + etiket)
+
+        nihai = (son_guncelleme.get("maliyet_ozetle") or {}).get("nihai_rapor") \
+            or (son_guncelleme.get("qa_kontrol") or {}).get("nihai_rapor")
+        st.session_state.pipeline_sonucu = {"nihai": nihai, "dizin": str(pipe_session_dir)}
+        st.success(f"✅ Pipeline tamamlandı. Çıktılar: `{pipe_session_dir}`")
+
+    pipe_sonuc = st.session_state.pipeline_sonucu
+    if pipe_sonuc and pipe_sonuc.get("nihai"):
+        nr = pipe_sonuc["nihai"]
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        c1.info(f"**Firma:** {nr.get('firma_adi')}")
+        c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or '—'}")
+        c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+
+        for bayrak in nr.get("qa_bayraklari", []):
+            st.error(f"⚠️ QA: {bayrak}")
+
+        izi = nr.get("pipeline_izi") or {}
+        if izi:
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("LLM Çağrısı", izi.get("toplam_llm_cagrisi"))
+            m2.metric("Girdi Token (~)", f"{izi.get('tahmini_girdi_token', 0):,}")
+            m3.metric("Süre (sn)", izi.get("toplam_sure_sn"))
+            m4.metric("Tahmini USD", izi.get("tahmini_usd"))
+
+        st.markdown(f"### ⚠️ {len(nr.get('tespit_edilen_riskler', []))} Kalitatif Risk Kalemi")
+        st.markdown(f"**Genel Kredi Risk Özeti:** {nr.get('genel_kredi_risk_ozeti')}")
+        st.markdown(f"**Analist Gerekçesi:** {nr.get('analist_gerekce_metni')}")
+        with st.expander("Nihai rapor (JSON)"):
+            st.json(nr)

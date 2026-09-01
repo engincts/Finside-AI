@@ -1,0 +1,24 @@
+# Finside AI — LangGraph pipeline checkpoint veritabanı (docs/PIPELINE_DESIGN.md §11)
+# Başlat:  docker compose up -d
+# .env:    PIPELINE_DB_URL=postgresql://finside:finside@localhost:5432/finside_pipeline
+
+services:
+  pipeline-db:
+    image: postgres:17-alpine
+    container_name: finside-pipeline-db
+    environment:
+      POSTGRES_USER: finside
+      POSTGRES_PASSWORD: finside
+      POSTGRES_DB: finside_pipeline
+    ports:
+      - "5432:5432"
+    volumes:
+      - pipeline_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finside -d finside_pipeline"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pipeline_db_data:

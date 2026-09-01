@@ -16,6 +16,63 @@ def _risk_signature(risk: BDRRiskItem) -> str:
     return f"{risk.baslik}. {risk.detay} {risk.etki_degerlendirmesi}"
 
 
+def _risk_signature_dict(risk: dict) -> str:
+    return f"{risk.get('baslik', '')}. {risk.get('detay', '')} {risk.get('etki_degerlendirmesi', '')}"
+
+
+NEAR_DUP_THRESHOLD = 0.88
+
+
+def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List[dict]:
+    """Faz 7 global dedup: önce başlık, sonra (varsa) embedding yakın-tekrar birleştirme.
+
+    Birleştirilen kalemlerin `kaynak_modeller` listeleri birleşir; hiçbir kalem içerik
+    kaybı yaşamaz (en zengin detay tutulur).
+    """
+    basliga_gore: dict = {}
+    for risk in riskler:
+        anahtar = _norm(risk.get("baslik") or "")
+        if not anahtar:
+            continue
+        if anahtar not in basliga_gore:
+            basliga_gore[anahtar] = {**risk, "kaynak_modeller": list(risk.get("kaynak_modeller", []))}
+        else:
+            mevcut = basliga_gore[anahtar]
+            mevcut["kaynak_modeller"] = sorted(
+                set(mevcut["kaynak_modeller"]) | set(risk.get("kaynak_modeller", []))
+            )
+            if len(str(risk.get("detay") or "")) > len(str(mevcut.get("detay") or "")):
+                mevcut["detay"] = risk["detay"]
+
+    kalanlar = list(basliga_gore.values())
+    if len(kalanlar) < 2 or not api_key:
+        return kalanlar
+
+    vektorler = _embed([_risk_signature_dict(r) for r in kalanlar], api_key)
+    if not vektorler:
+        return kalanlar
+
+    tutulan: List[dict] = []
+    tutulan_vek: List[List[float]] = []
+    for risk, vek in zip(kalanlar, vektorler):
+        eslesme = next(
+            (
+                i for i, tv in enumerate(tutulan_vek)
+                if _cosine(vek, tv) >= NEAR_DUP_THRESHOLD
+                and tutulan[i].get("risk_kategorisi") == risk.get("risk_kategorisi")
+            ),
+            None,
+        )
+        if eslesme is None:
+            tutulan.append(risk)
+            tutulan_vek.append(vek)
+        else:
+            tutulan[eslesme]["kaynak_modeller"] = sorted(
+                set(tutulan[eslesme].get("kaynak_modeller", [])) | set(risk.get("kaynak_modeller", []))
+            )
+    return tutulan
+
+
 def _cosine(a: List[float], b: List[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))

@@ -29,6 +29,57 @@ class ReportWriter:
         json_file.write_text(report.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
+    def save_json(cls, session_dir: Path, dosya_adi: str, veri: Any):
+        """Pipeline ara çıktılarını (segments.json, triage_log.json) kaydeder."""
+        (session_dir / dosya_adi).write_text(
+            json.dumps(veri, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    @classmethod
+    def save_portfolio_summary(cls, kok_dir: Path, satirlar: List[Dict[str, Any]]):
+        """Batch çalıştırma sonunda tek portföy özeti (tüm BDR'ler)."""
+        md_lines = [
+            "# Finside AI — Pipeline Portföy Özeti",
+            f"**Tarih/Saat:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
+            f"**İşlenen BDR:** {len(satirlar)}",
+            "",
+            "| Dosya | Firma | Dönem | Karar Eğilimi | Risk | QA Bayrak | Süre (sn) | ~USD | Modeller |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        ]
+        def _g(deger):
+            return deger if deger is not None else "-"
+
+        for s in satirlar:
+            md_lines.append(
+                f"| `{s.get('dosya', '-')}` | {s.get('firma') or '-'} | {s.get('donem') or '-'} "
+                f"| `{s.get('karar') or '-'}` | {s.get('risk_sayisi', 0)} | {s.get('qa_bayrak', 0)} "
+                f"| `{_g(s.get('sure_sn'))}` | `{_g(s.get('usd'))}` "
+                f"| {', '.join(s.get('modeller', []))} |"
+            )
+        (kok_dir / "portfoy_ozeti.md").write_text("\n".join(md_lines), encoding="utf-8")
+        (kok_dir / "portfoy_ozeti.json").write_text(
+            json.dumps(satirlar, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    @classmethod
+    def append_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+        """Pipeline LLM çağrı izlerini satır satır `trace.jsonl`'e ekler (append)."""
+        if not kayitlar:
+            return
+        trace_path = session_dir / "trace.jsonl"
+        with open(trace_path, "a", encoding="utf-8") as f:
+            for kayit in kayitlar:
+                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+
+    @classmethod
+    def save_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+        """Birikmiş tüm trace kayıtlarını `trace.jsonl`'e yazar (üzerine, tekrarsız)."""
+        trace_path = session_dir / "trace.jsonl"
+        with open(trace_path, "w", encoding="utf-8") as f:
+            for kayit in kayitlar:
+                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+
+    @classmethod
     def save_summary_metrics(cls, session_dir: Path, bdr_name: str, metrics_list: List[Dict[str, Any]]):
         summary_json_path = session_dir / "summary_metrics.json"
         summary_md_path = session_dir / "summary_metrics.md"

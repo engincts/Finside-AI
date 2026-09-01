@@ -27,7 +27,7 @@
 | **Google Gemini 3.1 Pro** | Google Cloud | 2M+ | **Çok Yüksek (Amiral)** | **%100 Yerleşik Pydantic** | ⭐⭐⭐⭐⭐ (Çok Yüksek) | En Karmaşık Kredi Kararları (Gold Standard) |
 | **OpenAI GPT-4o** | OpenAI | 128K | Yüksek | **%100 Pydantic Parse** | ⭐⭐⭐⭐⭐ (Çok Yüksek) | Genel Raporlama ve Şema Güvenilirliği |
 | **OpenAI o3-mini** | OpenAI | 200K | **Derin Sözel Muhakeme (o1/o3)** | **%100 Pydantic Parse** | ⭐⭐⭐⭐ (Yüksek) | Çoklu Dipnot Risk Çaprazlama & Covenant Üretimi |
-| **Claude 3.5 Sonnet** | Anthropic | 200K | Yüksek | Yüksek (Prompt İle) | ⭐⭐⭐⭐⭐ (İhtiyatlı Bankacı Dili) | Hukuki / İhtiyatlı Analist Raporlaması |
+| **Claude Sonnet 4.5** | Anthropic | 200K | Yüksek | **%100 Forced Tool-Use** | ⭐⭐⭐⭐⭐ (İhtiyatlı Bankacı Dili) | Hukuki / İhtiyatlı Analist Raporlaması |
 | **DeepSeek-R1 (API)** | DeepSeek / Cloud | 128K | **Derin Muhakeme (RL)** | Orta-Yüksek | ⭐⭐⭐⭐ (Yüksek) | Düşük Maliyetli Derin Muhakeme |
 
 ### 🔍 Kapalı Kaynak Modellerin Güçlü Yanları:
@@ -41,6 +41,7 @@
 
 | Model | Model Tipi | Bağlam | TR-MMLU Skoru | CETVEL Derecesi | Lisans | On-Prem Donanım Gereksinimi |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **GPT-OSS-120B** | Açık Ağırlık (MoE, ~5.1B aktif) | 128K | - | Test / Yeni | **Apache 2.0** | 1× 80GB GPU (MXFP4) / HF Serverless |
 | **Qwen2.5-72B-Instruct** | Açık Kaynak | 128K | **%77.28 (#1)** | Üst Segment | Qwen License | 2× A100 (80GB) / 48GB+ VRAM |
 | **Llama-3.3-70B-Instruct** | Açık Ağırlık | 128K | %74.00 | **Genel #1** | Llama Community | 2× A100 (80GB) / 40GB+ VRAM |
 | **Qwen3-32B-Instruct** | Açık Kaynak | 128K | High (Est.) | Yüksek | **Apache 2.0** | Tek A100 80GB / 2×24GB GPU |
@@ -70,6 +71,7 @@
   - Finansal metinlerin boyutu uzadıkça (özellikle **32K token üzerinde**), hem açık hem kapalı kaynak modellerin çok adımlı finansal konsept birleştirme yeteneği düşmektedir.
   - GPT-4-Turbo dahi 128K bağlamda en zorlu finansal görevlerde %42 oranında tekrarlı/bozuk çıktı üretmiştir.
 - **Mimari Çözüm**: BDR dipnotlarının tamamını devasa tek bir prompt'a koymak yerine; *Dava/Hukuki İhtilaflar*, *TRİ/Rehin/İpotek*, *Net Yabancı Para Açık Pozisyonu*, *Vergi Tarhiyatları* şeklinde bölüm bazlı **RAG + Bölümlendirilmiş Yapılandırılmış Prompt** mimarisi kullanılmalıdır.
+- ✅ **Uygulandı (2026-09-01):** yapı-farkında map-reduce chunking + sentez + embedding kapsama koruması — bkz. [ARCHITECTURE.md §4](ARCHITECTURE.md#4-büyük-girdi-yapı-farkında-map-reduce).
 
 ---
 

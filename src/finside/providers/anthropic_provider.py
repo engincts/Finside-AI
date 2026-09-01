@@ -104,3 +104,23 @@ class AnthropicProvider(BaseProvider):
             err_msg = f"Anthropic API Hata ({self.model_name}): {last_error}"
         print(f"[HATA] {err_msg}")
         return self.generate_mock_report(user_prompt, is_fallback=True, reason=err_msg)
+
+    def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
+        if not self.api_key:
+            raise RuntimeError(f"Anthropic raw_generate: ANTHROPIC_API_KEY yok ({self.model_name}).")
+        if not HAS_ANTHROPIC:
+            raise RuntimeError("Anthropic raw_generate: anthropic paketi yüklü değil.")
+
+        client = anthropic.Anthropic(api_key=self.api_key.strip())
+        system_prompt = self.system_prompt
+        if json_mode:
+            system_prompt += "\n\nYalnızca geçerli JSON döndür; başında/sonunda açıklama olmasın."
+
+        with client.messages.stream(
+            model=self.model_name,
+            max_tokens=min(self.max_tokens, self.MAX_OUTPUT_TOKENS),
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        ) as stream:
+            message = stream.get_final_message()
+        return next((b.text for b in message.content if getattr(b, "type", None) == "text"), "")

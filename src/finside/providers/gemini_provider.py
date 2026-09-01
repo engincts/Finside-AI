@@ -57,3 +57,26 @@ class GeminiProvider(BaseProvider):
             err_msg = f"Gemini API Hata ({self.model_name}): {e}"
             print(f"[HATA] {err_msg}")
             return self.generate_mock_report(user_prompt, is_fallback=True, reason=err_msg)
+
+    def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
+        if not self.api_key:
+            raise RuntimeError(f"Gemini raw_generate: GEMINI_API_KEY yok ({self.model_name}).")
+        if not HAS_GENAI:
+            raise RuntimeError("Gemini raw_generate: google-genai paketi yüklü değil.")
+
+        client = genai.Client(api_key=self.api_key)
+        cfg_kwargs = {
+            "system_instruction": self.system_prompt,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_output_tokens": self.max_tokens,
+        }
+        if json_mode:
+            cfg_kwargs["response_mime_type"] = "application/json"
+
+        response = client.models.generate_content(
+            model=self.model_name,
+            contents=user_prompt,
+            config=genai_types.GenerateContentConfig(**cfg_kwargs),
+        )
+        return response.text if getattr(response, "text", None) else ""

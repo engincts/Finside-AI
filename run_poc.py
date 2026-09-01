@@ -28,7 +28,24 @@ def main():
     parser.add_argument("--input", "-i", type=str, default=default_input)
     parser.add_argument("--model_id", "-m", type=str, default=None)
     parser.add_argument("--mock", action="store_true")
+    parser.add_argument("--batch", type=str, default=None,
+                        help="Klasördeki tüm .txt BDR'leri multi-agent pipeline ile işle")
+    parser.add_argument("--map-models", type=str, default=None,
+                        help="Pipeline ensemble modelleri (virgülle): a,b,c")
     args = parser.parse_args()
+
+    if args.batch:
+        from finside.pipeline.batch import calistir_batch
+
+        modeller = [m.strip() for m in args.map_models.split(",")] if args.map_models else None
+        ozet = calistir_batch(args.batch, secili_modeller=modeller)
+        print("=" * 80)
+        print(f"📦 Pipeline Batch Tamamlandı — {len(ozet)} BDR")
+        for s in ozet:
+            print(f"  {s['dosya']:<40} | {s['karar'] or '-':<45} | {s['risk_sayisi']} risk | {s['qa_bayrak']} QA")
+        print(f"📁 Portföy özeti: {Config.OUTPUT_DIR}/.../portfoy_ozeti.md")
+        print("=" * 80)
+        return
 
     input_path = Path(args.input)
     if not input_path.exists():

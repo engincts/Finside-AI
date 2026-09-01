@@ -1,0 +1,11 @@
+{
+  "bdr_parcasi": "BURAYA gerçek BDR dipnot metni parçası. Örn: 'Dipnot 21 - Taahhütler: Şirket ve bağlı ortaklıkları tarafından üçüncü kişilere verilen toplam teminat, rehin ve ipotek tutarı 6.897.006 bin TL olup bunun 4.512.330 bin TL'si bağlı ortaklıklar lehinedir.'",
+  "beklenen_cikti": {
+    "genel_kredi_risk_ozeti": "BURAYA analist üslubunda, tutarlarla desteklenmiş bütünsel risk özeti.",
+    "karar_egilimi": "Şartlı Olumlu (Ek Teminat / Kısıtlayıcı Taahhüt-Covenant İle)",
+    "analist_gerekce_metni": "BURAYA gerekçeli komite paragrafı.",
+    "komite_tavsiyesi_ve_sartlar": [
+      "BURAYA somut covenant / şart (örn: 'Bağlı ortaklık lehine TRİ tutarının 12 ayda %40 azaltılması')."
+    ]
+  }
+}
