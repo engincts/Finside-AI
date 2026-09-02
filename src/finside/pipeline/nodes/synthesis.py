@@ -13,10 +13,13 @@ from finside.pipeline.nodes.map_extract import map_modelleri
 from finside.pipeline.qa_rules import qa_bayraklari
 from finside.pipeline.state import PipelineState
 from finside.writers import ReportWriter
-from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem
+from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
 
 _KUNYE_ALANLARI = ("firma_adi", "rapor_donemi", "denetim_firmasi", "denetci_gorusu")
+_GORUS_TARAMA_KARAKTER = 12000  # "Görüş" bölümü BDR'nin başındadır
 _EMBED_ANAHTAR_ENV = "OPENAI_API_KEY"
+# Şema varsayılanları oy çoğunluğuna karışmasın (bkz. schemas.py alan varsayılanları)
+_SEMA_VARSAYILANLARI = {"Belirtilmemiş Şirket", "Belirtilmemiş Dönem"}
 
 
 def _kunye_oyla(ciktilar: List[dict]) -> dict:
@@ -25,10 +28,29 @@ def _kunye_oyla(ciktilar: List[dict]) -> dict:
         sayac = Counter(
             c["kunye"].get(alan)
             for c in ciktilar
-            if c.get("kunye") and c["kunye"].get(alan)
+            if c.get("kunye") and c["kunye"].get(alan) not in _SEMA_VARSAYILANLARI
         )
         kunye[alan] = sayac.most_common(1)[0][0] if sayac else None
     return kunye
+
+
+def _gorus_tara(ham_metin: str) -> str | None:
+    """Künye oylaması denetçi görüşünü veremediyse BDR'nin 'Görüş' bölümünü tara.
+
+    Türkçe BDR'lerde temiz görüş genelde "olumlu görüş" demez; "... gerçeğe uygun bir
+    biçimde sunmaktadır." ifadesiyle verilir. Şartlı görüşte "hariç olmak üzere" /
+    "Şartlı Görüş" başlığı bulunur.
+    """
+    dusuk = ham_metin[:_GORUS_TARAMA_KARAKTER].lower()
+    if "görüş bildirmekten kaçın" in dusuk:
+        return DenetciGorusTuru.GORUS_BILDIRMEKTEN_KACINMA.value
+    if "olumsuz görüş" in dusuk or "gerçeğe uygun bir biçimde sunmamakta" in dusuk:
+        return DenetciGorusTuru.OLUMSUZ.value
+    if "şartlı görüş" in dusuk or "sınırlı görüş" in dusuk or "hariç olmak üzere" in dusuk:
+        return DenetciGorusTuru.SARTLI_OLUMLU.value
+    if "gerçeğe uygun bir biçimde sunmakta" in dusuk or "olumlu görüş" in dusuk:
+        return DenetciGorusTuru.OLUMLU.value
+    return None
 
 
 def sentezle(state: PipelineState) -> dict:
@@ -36,6 +58,8 @@ def sentezle(state: PipelineState) -> dict:
     ham_riskler = list(state.get("uzlastirilmis_riskler", []))
     riskler = dedup_risk_dicts(ham_riskler, api_key=os.getenv(_EMBED_ANAHTAR_ENV))
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
+    if not kunye.get("denetci_gorusu"):
+        kunye["denetci_gorusu"] = _gorus_tara(state.get("ham_metin", ""))
 
     sistem, sablon = PromptLoader.load_prompt_md("synthesis_v1.md")
     user_prompt = sablon.format(
@@ -53,6 +77,12 @@ def sentezle(state: PipelineState) -> dict:
 
     nihai = BDRRiskAnalysisReport(
         kullanilan_model=f"pipeline ({', '.join(map_modelleri(state))})",
+        # Sentez çağrısı mock fallback'e düştüyse (API hatası/kota) bunu sessizce
+        # yutmuyoruz — nihai raporun güvenilirlik bayrağı buna göre işaretlenir.
+        is_mock_fallback=ust.is_mock_fallback,
+        fallback_reason=(
+            f"Sentez adımı: {ust.fallback_reason}" if ust.is_mock_fallback else None
+        ),
         firma_adi=kunye.get("firma_adi") or ust.firma_adi,
         rapor_donemi=kunye.get("rapor_donemi") or ust.rapor_donemi,
         denetim_firmasi=kunye.get("denetim_firmasi") or ust.denetim_firmasi,

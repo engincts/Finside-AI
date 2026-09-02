@@ -12,6 +12,12 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
     bayraklar: List[str] = []
     riskler = report.tespit_edilen_riskler
 
+    if report.is_mock_fallback:
+        bayraklar.append(
+            "Sentez adımı API hatası/kota nedeniyle mock çıktıya düştü — genel özet, "
+            f"karar eğilimi ve gerekçe güvenilir DEĞİL. ({report.fallback_reason})"
+        )
+
     kritik_var = any(r.risk_derecesi == RiskDerecesi.KRITIK for r in riskler)
     if kritik_var and report.karar_egilimi == KomiteKararEgilimi.OLUMLU:
         bayraklar.append("KRİTİK dereceli risk varken karar eğilimi 'Olumlu' — gözden geçirilmeli.")

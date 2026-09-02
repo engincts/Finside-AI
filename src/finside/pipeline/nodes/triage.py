@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 from config import Config
+from finside.chunking import pack_sections, split_sections
 from finside.loaders.prompt_loader import PromptLoader
 from finside.pipeline.keyword_map import boilerplate_mi, kategori_eslesmesi
 from finside.pipeline.llm_call import ham_cagri
@@ -10,6 +11,10 @@ from finside.writers import ReportWriter
 
 _TRIYAJ_ORNEK_KARAKTER = 6000
 _GRUP_KATIMI = "\n\n"
+_KUNYE_KARAKTER = 1200
+# Bu boyutun üstündeki bir segment başlığı boilerplate ibaresi içerse bile
+# elenmemeli — büyük segment kesinlikle gerçek dipnot içeriği taşır.
+_BOILERPLATE_MAKS_KARAKTER = 15000
 
 
 def _evet_mi(text: str) -> bool:
@@ -27,7 +32,7 @@ def triyaj_yap(state: PipelineState) -> dict:
     supheli: List[Segment] = []
 
     for s in segmentler:
-        if boilerplate_mi(s["baslik"]):
+        if boilerplate_mi(s["baslik"]) and s["karakter_sayisi"] < _BOILERPLATE_MAKS_KARAKTER:
             kararlar.append(TriajKarari(
                 segment_sira_no=s["sira_no"], dahil=False,
                 yontem="boilerplate", gerekce="standart açıklama / sunum bölümü",
@@ -86,6 +91,14 @@ def gruplari_olustur(state: PipelineState) -> dict:
     by_no = {s["sira_no"]: s for s in state["segmentler"]}
     dahil = [by_no[n] for n in state["analiz_edilecek_sira_nolari"] if n in by_no]
 
+    # Her grup, hangi segmentlerden oluştuğuna bakılmaksızın firma/dönem/denetçi
+    # künyesini görsün — aksi halde çoğu grup kimliği bilemez ve map çıktısında
+    # "Belirtilmemiş Şirket" gibi şema varsayımları oy çoğunluğuna karışır.
+    kunye = state.get("ham_metin", "")[:_KUNYE_KARAKTER].strip()
+
+    def _kunyeli(metin: str) -> str:
+        return f"{kunye}\n\n[... rapor devamı ...]\n\n{metin}" if kunye else metin
+
     gruplar: List[SegmentGrubu] = []
     cur_metin, cur_nolar = "", []
 
@@ -93,18 +106,24 @@ def gruplari_olustur(state: PipelineState) -> dict:
         parca = s["ham_metin"]
         if len(parca) > butce:
             if cur_nolar:
-                gruplar.append(_grup(len(gruplar), cur_nolar, cur_metin))
+                gruplar.append(_grup(len(gruplar), cur_nolar, _kunyeli(cur_metin)))
                 cur_metin, cur_nolar = "", []
-            for i in range(0, len(parca), butce):
-                gruplar.append(_grup(len(gruplar), [s["sira_no"]], parca[i:i + butce]))
+            # Dev segmenti kör karakter dilimlemek yerine iç dipnot/başlık
+            # sınırlarında böl (regex bir sınırı kaçırmış olabilir).
+            for alt in pack_sections(split_sections(parca), butce) or [parca]:
+                if len(alt) > butce:
+                    for i in range(0, len(alt), butce):
+                        gruplar.append(_grup(len(gruplar), [s["sira_no"]], _kunyeli(alt[i:i + butce])))
+                else:
+                    gruplar.append(_grup(len(gruplar), [s["sira_no"]], _kunyeli(alt)))
             continue
         if cur_metin and len(cur_metin) + len(parca) > butce:
-            gruplar.append(_grup(len(gruplar), cur_nolar, cur_metin))
+            gruplar.append(_grup(len(gruplar), cur_nolar, _kunyeli(cur_metin)))
             cur_metin, cur_nolar = "", []
         cur_metin = f"{cur_metin}{_GRUP_KATIMI}{parca}" if cur_metin else parca
         cur_nolar.append(s["sira_no"])
 
     if cur_nolar:
-        gruplar.append(_grup(len(gruplar), cur_nolar, cur_metin))
+        gruplar.append(_grup(len(gruplar), cur_nolar, _kunyeli(cur_metin)))
 
     return {"segment_gruplari": gruplar}

@@ -10,7 +10,12 @@ except ImportError:
 
 
 class OpenAIProvider(BaseProvider):
-    """OpenAI API entegrasyon sağlayıcısı (10K TPM Rate Limit & Safe Truncation Uyumlu)."""
+    """OpenAI API entegrasyon sağlayıcısı (Rate Limit & Safe Truncation Uyumlu)."""
+
+    # gpt-4o / gpt-4o-mini çıktı tavanı 16384. Pipeline reconcile/sentez rolleri
+    # büyük yapılandırılmış JSON üretiyor; 4096 tavanı "length limit reached" hatası
+    # verip mock fallback'e düşürüyordu.
+    MAX_OUTPUT_TOKENS = 16384
 
     def analyze(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
@@ -43,7 +48,7 @@ class OpenAIProvider(BaseProvider):
                 completion_kwargs.pop("temperature", None)
                 completion_kwargs.pop("top_p", None)
             else:
-                completion_kwargs["max_tokens"] = min(self.max_tokens, 4096)
+                completion_kwargs["max_tokens"] = min(self.max_tokens, self.MAX_OUTPUT_TOKENS)
 
             try:
                 completion = client.beta.chat.completions.parse(**completion_kwargs)

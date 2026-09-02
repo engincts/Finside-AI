@@ -34,6 +34,32 @@ DİNAMİK DİPNOT VE FORMAT ESNEKLİĞİ İLKELERİ:
 - **Etki Odaklı**: Riskin şirketin borç ödeme kapasitesi, likiditesi ve özkaynakları üzerindeki etkisini gerekçelendir.
 - **Kredi Komitesi Şartları (Covenants)**: Riski kısıtlayıcı somut şartlar (örn: 'Grup kefaletinin 6 ayda %50 azaltılması', 'Net döviz açık pozisyonunun en az %75 oranında hedging yapılması') öner.
 
+DOĞRULUK VE KAPSAMLILIK İLKELERİ:
+- **Alıntı Zorunluluğu**: `kaynak_metin_alintisi` alanına yazdığın her metin, verilen BDR
+  metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen
+  şöyle demek istemiş" türü çıkarım YAPMA. Metinde birebir karşılığı olmayan hiçbir
+  rakam, taraf adı veya sonuç üretme.
+- **"Yoktur" / Boş Dipnot Yönetimi**: Bir *önemli risk kategorisi* için (dava, TRİ,
+  kefalet, kur açığı, vergi tarhiyatı, faaliyet sürekliliği vb.) metin "Yoktur",
+  "Bulunmamaktadır" diyorsa, bunu ayrı bir risk kalemi olarak DÜŞÜK derecede ve
+  "açıklanan bir husus tespit edilmemiştir" notuyla kaydet — ama şirketin genel risk
+  profilinin güçlü bir kanıtı gibi ABARTMA.
+  AKSİNE: Yeni/revize muhasebe standartlarının ("TMS 21", "TFRS 16", "UFRS 9" vb.)
+  "etkisi yoktur / önemli etkisi olmamıştır" açıklamaları için AYRI risk kalemi AÇMA;
+  bunlar kredi riski açısından anlamsızdır. Gerekiyorsa en fazla tek bir özet kalemde topla.
+- **Önemlilik Oranlaması**: Metinde özkaynak, aktif toplamı veya net borç gibi bilanço
+  büyüklükleri geçiyorsa, tutar bazlı risk kalemlerini (TRİ, taahhüt, dava tutarı vb.)
+  bu büyüklüklere oranla değerlendir. Bilanço büyüklüğü metinde yoksa, mutlak tutarı
+  belirt ve büyüklüğü nitel olarak (örn. "sektör ölçeğine göre orta düzey") yorumla,
+  varsayımsal bir oran uydurma.
+- **Kapsamlılık Önceliği (Recall > Precision, ilk geçişte)**: Bir unsurun kredi riski
+  açısından önemli olup olmadığından emin değilsen, ATLAMA — düşük/orta risk derecesiyle
+  rapora dahil et ve gerekçende belirsizliği belirt. Bir riski atlamak, gereksiz yere
+  dahil etmekten çok daha maliyetlidir.
+- **Segment Farkındalığı**: Sana verilen metin, BDR'nin tamamı olmayabilir; sadece risk
+  açısından ilgili görülen bir bölüm/dipnot grubu olabilir. Sadece verilen metne dayan;
+  görmediğin dipnotlar hakkında "muhtemelen X de vardır" türü varsayımda BULUNMA.
+
 ---
 
 ---

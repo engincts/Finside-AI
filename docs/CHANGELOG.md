@@ -4,6 +4,85 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-03 — İlk TAM TEMİZ gerçek pipeline koşumu (6. deneme)
+
+**Konfig (Gemini'siz "ekonomi"):** `map=gpt-oss-120b`, `triage/reconciler/critic/
+synthesis/segmenter_fallback = gpt-4o-mini`.
+
+**Sonuç:** 108 sn wall / 310 sn LLM, 75 çağrı, **0 başarısız**, **$0.078**, 48 risk,
+`qa_bayraklari: []`. Hiçbir mock fallback yok.
+
+- Künye ✅ (Borusan Birleşik Boru Fabrikaları San. ve Tic. A.Ş. / 31 Aralık 2024)
+- `denetci_gorusu` ✅ "Olumlu Görüş" (`_gorus_tara` deterministik tarama)
+- `kaynak_modeller` ✅ tümü doğru (`gpt-oss-120b` / `critic` / birleşik), halüsinasyon yok
+- Dipnot kapsamı ✅ TRİ, akreditif, ihracat taahhütleri, ertelenmiş vergi, kıdem
+  tazminatı, ilişkili taraf, kur/faiz/fiyat riski, vergi tarhiyatları hepsi var
+- Özet gerçek rakamlarla ("teminatsız kısa vadeli borçlar 8.413.164 TL, döviz borçları
+  13.166.541 TL, nakit 2.356.166 TL")
+
+**Öncesindeki 8 bug** (6 gerçek koşumda bulundu): künye kaybı · kaynak_modeller
+halüsinasyonu · Gemini 429 retry · sentez mock fallback'in sessizce yutulması ·
+tüm dipnotların analizden düşmesi (segmentasyon + boilerplate) · muhasebe standardı
+gürültüsü · denetçi görüşü çıkarımı · OpenAI 4096 çıktı token tavanı.
+
+**Ekonomi maliyet referansı:** ~$0.08/BDR, ~5 dk. Premium (Claude-ağırlıklı) ~$2-4;
+tam açık-kaynak-dostu yol maliyetin ~%5'i.
+
+**Kalan (bug değil, ince ayar):** 48 risk biraz fazla — daha güçlü bir reconciler
+modeli düşük değerli KDK alt-kalemlerini daha iyi birleştirebilir.
+
+---
+
+## 2026-09-01 — İlk gerçek uçtan uca pipeline testi + 3 bug fix
+
+**Konfig:** `map_models=["gpt-oss-120b"]`, `reconciler/critic/synthesis/segmenter_fallback
+= gemini-3.6-flash`, `triage = gpt-4o-mini` (ucuz senaryo, `docs/ARCHITECTURE.md` §0'daki
+tahmine yakın). Borusan BDR'si (593K karakter), gerçek API.
+
+**Sonuç:** 372 sn, 19 LLM çağrısı, 1 başarısız (Gemini free-tier 429), $0.0315,
+10 risk, `qa_bayraklari: []`. Fonksiyonel olarak uçtan uca çalıştı.
+
+**Bulunan ve düzeltilen 3 bug** (bkz. commit `aabdbb4`):
+
+1. **Künye kaybı** — segment grupları firma/dönem/denetçi bilgisini taşımıyordu,
+   çoğu grup şema varsayımı ("Belirtilmemiş Şirket") döndürüyordu ve bu değer oy
+   çoğunluğuna karışıyordu → nihai raporda firma adı boş çıktı. `gruplari_olustur`
+   artık her gruba BDR'nin ilk 1200 karakterini (künye) ekliyor; `synthesis.py` ayrıca
+   şema varsayılanlarını oy sayımından hariç tutuyor.
+2. **`kaynak_modeller` halüsinasyonu** — bu izlenebilirlik alanı LLM'in serbestçe
+   dolduracağı bir şema alanıydı; gemini "claude-3-5-sonnet", "audit-agent-v1",
+   "audit_model" gibi **hiç var olmayan model adları** üretti. `reconciler.py` /
+   `critic.py` artık bu alanı LLM'den hiç almıyor, deterministik atıyor.
+3. **Gemini 429** tek denemede mock fallback'e düşürüyordu → `GeminiProvider`'a
+   429'a özel 1 tekrar + 8 sn bekleme eklendi.
+
+**Ders:** free-tier Gemini kotası (dk başına 5 istek) reconciler+critic+synthesis+
+segmenter_fallback'in hepsini aynı modele yüklemek için yetersiz; gerçek/daha büyük
+koşumlarda ücretli tier veya rolleri farklı sağlayıcılara dağıtmak gerekir.
+
+**Doğrulama koşumu (`85f6e11`):** aynı ucuz konfigle tekrar çalıştırıldı. Künye (✅
+Borusan Birleşik Boru Fabrikaları San. ve Tic. A.Ş., 31 Aralık 2024) ve `kaynak_modeller`
+(✅ 35 riskin tamamı doğru `['gpt-oss-120b']`, halüsinasyon yok) düzeldi. Ama bu kez
+Gemini'nin **günlük** ücretsiz kota limiti (20 istek/gün) bu oturumdaki yoğun testle
+tükenmişti → 30 çağrının 15'i mock fallback'e düştü, sentez de düştü. Bu ortaya 4.
+bir bug çıkardı: **sentez mock fallback'e düşünce `nihai_rapor.is_mock_fallback` hiç
+işaretlenmiyordu** — kanıtlı mock metni sessizce gerçek özet gibi görünüyordu.
+`synthesis.py` artık `is_mock_fallback`/`fallback_reason`'ı sentez çağrısından taşıyor;
+`qa_rules.py` bunu açık bir bayrakla işaretliyor ("özet/karar/gerekçe güvenilir DEĞİL").
+
+---
+
+## 2026-09-01 — Model fiyatları (`config.json`)
+
+- Tüm 20 modele `usd_1k_in` / `usd_1k_out` (1K token başına USD) eklendi. Artık
+  `pipeline/nodes/cost.py` `maliyet_ozetle` gerçek `tahmini_usd` hesaplayabiliyor
+  (önceden hep 0 idi, fiyat alanı yoktu).
+- **Rakamlar kamuya açık liste fiyatlarından yaklaşık tahmindir** — gerçek fatura ile
+  karşılaştırıp güncellenmeli, özellikle HF serverless açık kaynak modeller (barındıran
+  sağlayıcıya göre değişir) ve Gemini 3.x / Claude Sonnet 4.5 gibi yeni sürümler.
+
+---
+
 ## 2026-09-01 — Benchmark hızı + iki mod dokümantasyonu
 
 - **`app.py`:** kıyas panelinde `truncate` denemesi geri alındı — tam yapı-farkında
