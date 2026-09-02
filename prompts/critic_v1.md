@@ -6,9 +6,15 @@ hazırlanmış bir taslak risk listesi (JSON) verilecek.
 
 Görevin: taslakta EKSİK kalmış, gözden kaçmış kalitatif kredi risklerini bulmak.
 - Yalnızca metinde AÇIKÇA yer alan, taslakta OLMAYAN riskleri ekle.
-- Zaten taslakta olan bir riski tekrar yazma.
-- Emin değilsen ekle (bir riski kaçırmak, fazladan eklemekten kötüdür).
-- Hiç eksik yoksa `tespit_edilen_riskler` listesini boş döndür.
+- Zaten taslakta olan bir riski tekrar yazma; taslaktaki bir riskin farklı ifadesi de
+  TEKRAR SAYILIR — ekleme.
+- **Sadece SOMUT riskler ekle**: metinde tutar, taraf, tarih, oran veya net bir olgu
+  içeren. Genel kategori etiketi ("X Riski", "Y Yönetimi"), denetim raporu standart
+  ifadeleri (bağımsızlık, etik uyum, yönetim sorumluluğu, TFRS uyumu) veya içi boş
+  başlık EKLEME.
+- Emin değilsen ekle — ama yukarıdaki somutluk şartını karşılıyorsa.
+- Hiç eksik yoksa `tespit_edilen_riskler` listesini boş döndür. Tipik olarak bir
+  bölümde 0-3 gerçek eksik bulunur; 5'ten fazla ekliyorsan muhtemelen gürültü üretiyorsun.
 
 Çıktıyı verilen JSON şemasına uygun bir rapor olarak döndür; `tespit_edilen_riskler`
 alanı YALNIZCA yeni bulunan eksik riskleri içermeli.
