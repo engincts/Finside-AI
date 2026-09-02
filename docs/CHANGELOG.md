@@ -4,6 +4,35 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-03 — İlk TAM TEMİZ gerçek pipeline koşumu (6. deneme)
+
+**Konfig (Gemini'siz "ekonomi"):** `map=gpt-oss-120b`, `triage/reconciler/critic/
+synthesis/segmenter_fallback = gpt-4o-mini`.
+
+**Sonuç:** 108 sn wall / 310 sn LLM, 75 çağrı, **0 başarısız**, **$0.078**, 48 risk,
+`qa_bayraklari: []`. Hiçbir mock fallback yok.
+
+- Künye ✅ (Borusan Birleşik Boru Fabrikaları San. ve Tic. A.Ş. / 31 Aralık 2024)
+- `denetci_gorusu` ✅ "Olumlu Görüş" (`_gorus_tara` deterministik tarama)
+- `kaynak_modeller` ✅ tümü doğru (`gpt-oss-120b` / `critic` / birleşik), halüsinasyon yok
+- Dipnot kapsamı ✅ TRİ, akreditif, ihracat taahhütleri, ertelenmiş vergi, kıdem
+  tazminatı, ilişkili taraf, kur/faiz/fiyat riski, vergi tarhiyatları hepsi var
+- Özet gerçek rakamlarla ("teminatsız kısa vadeli borçlar 8.413.164 TL, döviz borçları
+  13.166.541 TL, nakit 2.356.166 TL")
+
+**Öncesindeki 8 bug** (6 gerçek koşumda bulundu): künye kaybı · kaynak_modeller
+halüsinasyonu · Gemini 429 retry · sentez mock fallback'in sessizce yutulması ·
+tüm dipnotların analizden düşmesi (segmentasyon + boilerplate) · muhasebe standardı
+gürültüsü · denetçi görüşü çıkarımı · OpenAI 4096 çıktı token tavanı.
+
+**Ekonomi maliyet referansı:** ~$0.08/BDR, ~5 dk. Premium (Claude-ağırlıklı) ~$2-4;
+tam açık-kaynak-dostu yol maliyetin ~%5'i.
+
+**Kalan (bug değil, ince ayar):** 48 risk biraz fazla — daha güçlü bir reconciler
+modeli düşük değerli KDK alt-kalemlerini daha iyi birleştirebilir.
+
+---
+
 ## 2026-09-01 — İlk gerçek uçtan uca pipeline testi + 3 bug fix
 
 **Konfig:** `map_models=["gpt-oss-120b"]`, `reconciler/critic/synthesis/segmenter_fallback
