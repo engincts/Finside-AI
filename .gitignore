@@ -47,3 +47,10 @@ models_cache/
 
 #Data
 data/
+# Pipeline ara çıktıları (yanlış dizine yazılırsa)
+/segments.json
+/triage_log.json
+/map_raw.json
+/nihai_rapor.json
+/pipeline_izi.json
+/trace.jsonl
