@@ -15,7 +15,8 @@ Görevin: bu risklere dayanarak Kredi Komitesi Raporu'nun ÜST DÜZEY alanların
 - `komite_tavsiyesi_ve_sartlar`: riski kısıtlayan somut covenant/şartlar.
 
 `firma_adi`, `rapor_donemi`, `denetim_firmasi`, `denetci_gorusu` alanlarını künyeden doldur.
-`tespit_edilen_riskler` alanına verilen risk listesini AYNEN geri koy (değiştirme, ekleme, çıkarma).
+`tespit_edilen_riskler` alanını BOŞ LİSTE (`[]`) olarak bırak — risk listesi ayrıca
+sistem tarafından eklenecek, senin tekrar yazman gerekmiyor (çıktıyı kısa tutar).
 
 ## USER_PROMPT
 Firma künyesi:
