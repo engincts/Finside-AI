@@ -39,11 +39,14 @@ DOĞRULUK VE KAPSAMLILIK İLKELERİ:
   metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen
   şöyle demek istemiş" türü çıkarım YAPMA. Metinde birebir karşılığı olmayan hiçbir
   rakam, taraf adı veya sonuç üretme.
-- **"Yoktur" / Boş Dipnot Yönetimi**: Bir risk kategorisi için metin "Yoktur",
-  "Bulunmamaktadır" gibi bir ifade içeriyorsa, bunu ayrı bir risk kalemi olarak DÜŞÜK
-  risk derecesiyle ve "açıklanan bir husus tespit edilmemiştir" notuyla kaydet — ama bunu
-  şirketin genel risk profilinin güçlü bir kanıtı gibi ABARTMA; sadece rapor tarihi
-  itibarıyla bilinen bir husus olmadığını gösterir.
+- **"Yoktur" / Boş Dipnot Yönetimi**: Bir *önemli risk kategorisi* için (dava, TRİ,
+  kefalet, kur açığı, vergi tarhiyatı, faaliyet sürekliliği vb.) metin "Yoktur",
+  "Bulunmamaktadır" diyorsa, bunu ayrı bir risk kalemi olarak DÜŞÜK derecede ve
+  "açıklanan bir husus tespit edilmemiştir" notuyla kaydet — ama şirketin genel risk
+  profilinin güçlü bir kanıtı gibi ABARTMA.
+  AKSİNE: Yeni/revize muhasebe standartlarının ("TMS 21", "TFRS 16", "UFRS 9" vb.)
+  "etkisi yoktur / önemli etkisi olmamıştır" açıklamaları için AYRI risk kalemi AÇMA;
+  bunlar kredi riski açısından anlamsızdır. Gerekiyorsa en fazla tek bir özet kalemde topla.
 - **Önemlilik Oranlaması**: Metinde özkaynak, aktif toplamı veya net borç gibi bilanço
   büyüklükleri geçiyorsa, tutar bazlı risk kalemlerini (TRİ, taahhüt, dava tutarı vb.)
   bu büyüklüklere oranla değerlendir. Bilanço büyüklüğü metinde yoksa, mutlak tutarı
