@@ -518,8 +518,23 @@ with tab_pipeline:
             m3.metric("Süre (sn)", izi.get("toplam_sure_sn"))
             m4.metric("Tahmini USD", izi.get("tahmini_usd"))
 
-        st.markdown(f"### ⚠️ {len(nr.get('tespit_edilen_riskler', []))} Kalitatif Risk Kalemi")
-        st.markdown(f"**Genel Kredi Risk Özeti:** {nr.get('genel_kredi_risk_ozeti')}")
-        st.markdown(f"**Analist Gerekçesi:** {nr.get('analist_gerekce_metni')}")
+        from finside.report_md import report_to_markdown
+        from prompts.schemas import BDRRiskAnalysisReport as _Rapor
+
+        try:
+            _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"))
+        except Exception:
+            _md = None
+
+        if _md:
+            st.download_button("⬇️ Nihai Raporu İndir (.md)", data=_md,
+                               file_name="nihai_rapor.md", mime="text/markdown")
+            with st.container(height=600):
+                st.markdown(_md)
+        else:
+            st.markdown(f"### ⚠️ {len(nr.get('tespit_edilen_riskler', []))} Kalitatif Risk Kalemi")
+            st.markdown(f"**Genel Kredi Risk Özeti:** {nr.get('genel_kredi_risk_ozeti')}")
+            st.markdown(f"**Analist Gerekçesi:** {nr.get('analist_gerekce_metni')}")
+
         with st.expander("Nihai rapor (JSON)"):
             st.json(nr)

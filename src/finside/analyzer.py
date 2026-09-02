@@ -8,7 +8,8 @@ from finside.chunking import build_chunks
 from finside.dedupe import uncovered_risks
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
-from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem, RiskDerecesi
+from finside.report_md import report_to_markdown
+from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem
 
 EMBED_API_KEY_ENV = "OPENAI_API_KEY"
 
@@ -176,68 +177,16 @@ class BDRAnalyzer:
         return list(seen.values())
 
     def format_report_as_markdown(self, report: BDRRiskAnalysisReport) -> str:
-        lines = [
-            "# 📊 BDR Kredi Komitesi Risk Değerlendirme Raporu"
-        ]
-
-        if report.is_mock_fallback:
-            lines.extend([
-                "> [!WARNING]",
-                "> **MOCK FALLBACK UYARISI**: Bu rapor gerçek model API çağrısı sırasında hata alındığı için otomatik mock simülasyona düşmüştür.",
-                f"> **Hata Nedeni:** `{report.fallback_reason or 'API Çağrı Hatası'}`",
-                ""
-            ])
-
-        lines.extend([
-            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, Reasoning: `{self.model_config.get('reasoning_effort', 'medium')}`, Temp: `{self.model_config.get('temperature', 0.1)}`, Top-p: `{self.model_config.get('top_p', 0.9)}`)",
+        ust = [
+            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, "
+            f"Reasoning: `{self.model_config.get('reasoning_effort', 'medium')}`, "
+            f"Temp: `{self.model_config.get('temperature', 0.1)}`, "
+            f"Top-p: `{self.model_config.get('top_p', 0.9)}`)",
             f"**Analiz Süresi:** `{report.analiz_suresi_saniye} saniye`",
             f"**Firma Adı:** {report.firma_adi}",
             f"**Rapor Dönemi:** {report.rapor_donemi}",
             f"**Bağımsız Denetim Firması:** {report.denetim_firmasi or 'Belirtilmemiş'}",
             f"**Denetçi Görüşü:** `{report.denetci_gorusu.value if report.denetci_gorusu else 'Belirtilmemiş'}`",
             f"**Genel Karar Eğilimi:** `{report.karar_egilimi.value}`",
-            "",
-            "---",
-            "## 📌 1. Genel Kredi Risk Özeti",
-            report.genel_kredi_risk_ozeti,
-            "",
-            "---",
-            "## ⚠️ 2. Tespit Edilen Kalitatif Risk Kalemleri",
-            ""
-        ])
-
-        for idx, risk in enumerate(report.tespit_edilen_riskler, 1):
-            severity = {
-                RiskDerecesi.DUSUK: "🟢 Düşük",
-                RiskDerecesi.ORTA: "🟡 Orta",
-                RiskDerecesi.YUKSEK: "🔴 Yüksek",
-                RiskDerecesi.KRITIK: "🔥 Kritik"
-            }.get(risk.risk_derecesi, risk.risk_derecesi.value)
-
-            lines.extend([
-                f"### {idx}. {risk.baslik}",
-                f"- **Kategori:** `{risk.risk_kategorisi.value}`",
-                f"- **Dipnot Referansı:** `{risk.dipnot_referansi or 'BDR Genel'}`",
-                f"- **Risk Derecesi:** {severity}",
-                f"- **Tutar:** {risk.tutar_bilgisi or 'Belirtilmemiş'}",
-                f"- **Detay:** {risk.detay}",
-                f"- **Kredi Etkisi:** {risk.etki_degerlendirmesi}",
-                f"- **BDR Alıntısı:** *\"{risk.kaynak_metin_alintisi}\"*",
-                ""
-            ])
-
-        lines.extend([
-            "---",
-            "## 📋 3. Kredi Komitesi Tavsiyeleri & Şartlar",
-        ])
-        for sart in report.komite_tavsiyesi_ve_sartlar:
-            lines.append(f"- [ ] {sart}")
-
-        lines.extend([
-            "",
-            "---",
-            "## 📝 4. Analist Gerekçelendirme Metni",
-            report.analist_gerekce_metni
-        ])
-
-        return "\n".join(lines)
+        ]
+        return report_to_markdown(report, ust_satirlar=ust)
