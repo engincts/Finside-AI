@@ -8,15 +8,24 @@ Write-Host "====================================================================
 Write-Host "Finside AI - Kurumsal Kredi Tahsis Karar Destek Sistemi" -ForegroundColor Green
 Write-Host "================================================================================" -ForegroundColor Cyan
 
-# 1. Python & Pip Bağımlılık Yüklemesi
-Write-Host "Bagimliliklar (pydantic, google-genai, openai, anthropic, huggingface-hub, streamlit) kontrol ediliyor..." -ForegroundColor Yellow
-python -m pip install --quiet -r requirements.txt
+Set-Location -Path $PSScriptRoot
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Paket yuklemesi tamamlandi..." -ForegroundColor Yellow
+# --- 0. venv (proje bağımlılıkları BURADA — sistem Python'ı DEĞİL) ---
+$venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $venvPython)) {
+    Write-Host "Sanal ortam (.venv) bulunamadi, olusturuluyor..." -ForegroundColor Yellow
+    python -m venv .venv
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "HATA: .venv olusturulamadi. Python 3.10+ kurulu mu?" -ForegroundColor Red
+        exit 1
+    }
 }
 
-# 2. Streamlit Web Uygulamasını Başlatma
-Write-Host "Streamlit Web Kullanici Arayuzu baslatiliyor..." -ForegroundColor Green
-Write-Host "Tarayicinizda acin: http://localhost:8501" -ForegroundColor Cyan
-streamlit run app.py
+# --- 1. Bağımlılıklar (langgraph, streamlit, LLM SDK'lari, rapidfuzz...) ---
+Write-Host "Bagimliliklar kontrol ediliyor (.venv)..." -ForegroundColor Yellow
+& $venvPython -m pip install --quiet --upgrade pip
+& $venvPython -m pip install --quiet -r requirements.txt
+
+# --- 2. Streamlit Web Uygulamasi (mutlaka .venv'den) ---
+Write-Host "Streamlit baslatiliyor: http://localhost:8501" -ForegroundColor Cyan
+& $venvPython -m streamlit run app.py
