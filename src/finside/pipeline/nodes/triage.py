@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 from config import Config
+from finside.chunking import pack_sections, split_sections
 from finside.loaders.prompt_loader import PromptLoader
 from finside.pipeline.keyword_map import boilerplate_mi, kategori_eslesmesi
 from finside.pipeline.llm_call import ham_cagri
@@ -11,6 +12,9 @@ from finside.writers import ReportWriter
 _TRIYAJ_ORNEK_KARAKTER = 6000
 _GRUP_KATIMI = "\n\n"
 _KUNYE_KARAKTER = 1200
+# Bu boyutun üstündeki bir segment başlığı boilerplate ibaresi içerse bile
+# elenmemeli — büyük segment kesinlikle gerçek dipnot içeriği taşır.
+_BOILERPLATE_MAKS_KARAKTER = 15000
 
 
 def _evet_mi(text: str) -> bool:
@@ -28,7 +32,7 @@ def triyaj_yap(state: PipelineState) -> dict:
     supheli: List[Segment] = []
 
     for s in segmentler:
-        if boilerplate_mi(s["baslik"]):
+        if boilerplate_mi(s["baslik"]) and s["karakter_sayisi"] < _BOILERPLATE_MAKS_KARAKTER:
             kararlar.append(TriajKarari(
                 segment_sira_no=s["sira_no"], dahil=False,
                 yontem="boilerplate", gerekce="standart açıklama / sunum bölümü",
@@ -104,8 +108,14 @@ def gruplari_olustur(state: PipelineState) -> dict:
             if cur_nolar:
                 gruplar.append(_grup(len(gruplar), cur_nolar, _kunyeli(cur_metin)))
                 cur_metin, cur_nolar = "", []
-            for i in range(0, len(parca), butce):
-                gruplar.append(_grup(len(gruplar), [s["sira_no"]], _kunyeli(parca[i:i + butce])))
+            # Dev segmenti kör karakter dilimlemek yerine iç dipnot/başlık
+            # sınırlarında böl (regex bir sınırı kaçırmış olabilir).
+            for alt in pack_sections(split_sections(parca), butce) or [parca]:
+                if len(alt) > butce:
+                    for i in range(0, len(alt), butce):
+                        gruplar.append(_grup(len(gruplar), [s["sira_no"]], _kunyeli(alt[i:i + butce])))
+                else:
+                    gruplar.append(_grup(len(gruplar), [s["sira_no"]], _kunyeli(alt)))
             continue
         if cur_metin and len(cur_metin) + len(parca) > butce:
             gruplar.append(_grup(len(gruplar), cur_nolar, _kunyeli(cur_metin)))

@@ -18,6 +18,9 @@ from finside.pipeline.state import Segment, TraceKaydi
 BEKLENEN_MIN_SEGMENT = 12
 BEKLENEN_MAX_SEGMENT = 90
 MIN_SEGMENT_KARAKTER = 300
+# Regex bu kadar segment ürettiyse metin yeterince bölünmüştür — dev segmentler
+# gruplari_olustur içinde yapı-farkında bölünür; LLM fallback'e gerek yok.
+YETERLI_SEGMENT = 10
 CAPA_IBARELERI = (
     "BAĞIMSIZ DENETÇİ", "KİLİT DENETİM KONULARI", "GÖRÜŞÜN DAYANAĞI",
     "FİNANSAL TABLOLARA İLİŞKİN", "DİPNOT",
@@ -178,7 +181,10 @@ def segment_bdr(
 ) -> SegmentSonucu:
     segmentler = regex_segmentle(ham_metin)
     guven = segmentation_confidence(segmentler, ham_metin)
-    if guven >= guven_esigi or not fallback_model:
+    # LLM fallback yalnızca metin GERÇEKTEN az bölündüğünde — tek bir dev segment
+    # varken tüm regex sonucunu çöpe atıp LLM'e gitmek (gözlemlenen) daha kötü
+    # sonuç veriyor (LLM tüm dipnotları tek bloğa çökertebiliyor).
+    if len(segmentler) >= YETERLI_SEGMENT or guven >= guven_esigi or not fallback_model:
         return SegmentSonucu(segmentler, guven, "regex")
 
     from finside.pipeline.llm_call import ham_cagri
