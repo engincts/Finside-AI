@@ -25,9 +25,55 @@ PIPELINE_DEFAULTS: Dict[str, Any] = {
 
 
 class Config:
-    BASE_DIR = BASE_DIR
-    DATA_DIR = BASE_DIR / "data" / "bdr_samples"
-    OUTPUT_DIR = BASE_DIR / "outputs"
+    """Tek Noktadan Yönetim (Centralized Configuration & Single Source of Truth).
+    Projedeki tüm sabitler, eşik değerleri, limitler ve dizin tanımları bu sınıfta toplanmıştır.
+    """
+    # 1. Dizin ve Dosya Yolları (Paths)
+    BASE_DIR: Path = BASE_DIR
+    DATA_DIR: Path = BASE_DIR / "data" / "bdr_samples"
+    OUTPUT_DIR: Path = BASE_DIR / "outputs"
+    PROMPTS_DIR: Path = BASE_DIR / "prompts"
+
+    # 2. Çalıştırma & UI Benchmark Ayarları
+    MAX_PARALLEL_MODELS: int = 8
+    BENCHMARK_MAX_WAIT_SEC: int = 600
+    BDR_PREVIEW_CHARS: int = 20_000
+
+    # 3. Analizör & Parçalama (Chunking) Ayarları
+    DEFAULT_MAX_INPUT_CHARS: int = 150_000
+    TRUNCATE_MAX_CHARS: int = 60_000
+    CHUNK_UTILIZATION: float = 0.9
+    MAX_CHUNK_WORKERS: int = 4
+
+    PROVIDER_INPUT_LIMITS: Dict[str, int] = {
+        "huggingface": 90_000,
+        "openai": 200_000,
+        "anthropic": 200_000,
+        "gemini": 200_000,
+        "mock": 5_000_000,
+    }
+
+    # 4. Tekleştirme & Embedding Ayarları (Deduplication)
+    EMBED_MODEL: str = "text-embedding-3-small"
+    COVERAGE_THRESHOLD: float = 0.80
+    JACCARD_THRESHOLD: float = 0.60
+    NEAR_DUP_THRESHOLD: float = 0.88
+    EMBED_API_KEY_ENV: str = "OPENAI_API_KEY"
+
+    # 5. Segmentasyon Ayarları (BDR Segmentation)
+    BEKLENEN_MIN_SEGMENT: int = 12
+    BEKLENEN_MAX_SEGMENT: int = 90
+    MIN_SEGMENT_KARAKTER: int = 300
+    YETERLI_SEGMENT: int = 10
+    LLM_GIRDI_KARAKTER_SINIRI: int = 200_000
+
+    # 6. LLM Token & Reasoning Haritası
+    EFFORT_TOKEN_MAP: Dict[str, int] = {
+        "low": 2048,
+        "medium": 4096,
+        "high": 8192,
+        "auto": 8192,
+    }
 
     @classmethod
     def load_config(cls) -> Dict[str, Any]:

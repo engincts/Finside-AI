@@ -6,7 +6,7 @@ from config import Config
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
 from finside.pipeline.state import TraceKaydi
-from prompts.schemas import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport
 
 
 @dataclass
@@ -71,7 +71,10 @@ def rapor_cagrisi(
     )
 
     start = time.perf_counter()
-    report = provider.analyze(user_prompt)
+    try:
+        report = provider.analyze(user_prompt)
+    except Exception as err:
+        report = provider.generate_mock_report(user_prompt, is_fallback=True, reason=str(err))
     elapsed = round(time.perf_counter() - start, 3)
 
     trace = _trace(

@@ -13,7 +13,7 @@ from finside.pipeline.nodes.map_extract import map_modelleri
 from finside.pipeline.qa_rules import qa_bayraklari
 from finside.pipeline.state import PipelineState
 from finside.writers import ReportWriter
-from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
+from finside.models import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
 
 _KUNYE_ALANLARI = ("firma_adi", "rapor_donemi", "denetim_firmasi", "denetci_gorusu")
 _GORUS_TARAMA_KARAKTER = 12000  # "Görüş" bölümü BDR'nin başındadır

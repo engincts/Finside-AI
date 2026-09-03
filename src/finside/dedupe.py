@@ -1,11 +1,8 @@
 import math
 from typing import List, Optional
 
-from prompts.schemas import BDRRiskItem
-
-EMBED_MODEL = "text-embedding-3-small"
-COVERAGE_THRESHOLD = 0.80
-JACCARD_THRESHOLD = 0.6
+from config import Config
+from finside.models import BDRRiskItem
 
 
 def _norm(text: str) -> str:
@@ -18,9 +15,6 @@ def _risk_signature(risk: BDRRiskItem) -> str:
 
 def _risk_signature_dict(risk: dict) -> str:
     return f"{risk.get('baslik', '')}. {risk.get('detay', '')} {risk.get('etki_degerlendirmesi', '')}"
-
-
-NEAR_DUP_THRESHOLD = 0.88
 
 
 def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List[dict]:
@@ -58,7 +52,7 @@ def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List
         eslesme = next(
             (
                 i for i, tv in enumerate(tutulan_vek)
-                if _cosine(vek, tv) >= NEAR_DUP_THRESHOLD
+                if _cosine(vek, tv) >= Config.NEAR_DUP_THRESHOLD
                 and tutulan[i].get("risk_kategorisi") == risk.get("risk_kategorisi")
             ),
             None,
@@ -84,7 +78,7 @@ def _embed(texts: List[str], api_key: str) -> Optional[List[List[float]]]:
     try:
         from openai import OpenAI
 
-        response = OpenAI(api_key=api_key).embeddings.create(model=EMBED_MODEL, input=texts)
+        response = OpenAI(api_key=api_key).embeddings.create(model=Config.EMBED_MODEL, input=texts)
         return [item.embedding for item in response.data]
     except Exception:
         return None
@@ -97,7 +91,7 @@ def _covered_by_tokens(candidate: BDRRiskItem, reference: List[BDRRiskItem]) -> 
     for ref in reference:
         ref_tokens = set(_norm(ref.baslik).split())
         union = cand_tokens | ref_tokens
-        if union and len(cand_tokens & ref_tokens) / len(union) >= JACCARD_THRESHOLD:
+        if union and len(cand_tokens & ref_tokens) / len(union) >= Config.JACCARD_THRESHOLD:
             return True
     return False
 
@@ -106,8 +100,9 @@ def uncovered_risks(
     candidate: List[BDRRiskItem],
     reference: List[BDRRiskItem],
     api_key: Optional[str] = None,
-    threshold: float = COVERAGE_THRESHOLD,
+    threshold: Optional[float] = None,
 ) -> List[BDRRiskItem]:
+    effective_threshold = threshold if threshold is not None else Config.COVERAGE_THRESHOLD
     """`reference` (sentez LLM listesi) tarafından kapsanmayan `candidate` risklerini döndürür.
 
     Sadece 'düşürülmüş' riskleri geri ekler; hiçbir riski birleştirmez veya silmez.
@@ -148,7 +143,7 @@ def uncovered_risks(
 
         if cand_vecs and ref_vecs:
             best = max(_cosine(cand_vecs[index], ref_vecs[ref_index]) for ref_index, _ in same_note_refs)
-            if best >= threshold:
+            if best >= effective_threshold:
                 continue
         elif _covered_by_tokens(item, [ref for _, ref in same_note_refs]):
             continue

@@ -8,21 +8,8 @@ from finside.chunking import build_chunks
 from finside.dedupe import uncovered_risks
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
-from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem, RiskDerecesi
-
-EMBED_API_KEY_ENV = "OPENAI_API_KEY"
-
-DEFAULT_MAX_INPUT_CHARS = 150_000
-PROVIDER_INPUT_LIMITS = {
-    "huggingface": 90_000,
-    "openai": 200_000,
-    "anthropic": 200_000,
-    "gemini": 200_000,
-    "mock": 5_000_000,
-}
-CHUNK_UTILIZATION = 0.9
-MAX_CHUNK_WORKERS = 4
-TRUNCATE_MAX_CHARS = 60_000  # kıyas modunda: bir modeli değerlendirmek için yeterli dilim
+from finside.report_md import report_to_markdown
+from finside.models import BDRRiskAnalysisReport, BDRRiskItem
 
 CHUNK_INSTRUCTION = (
     "[BDR PARÇA {idx}/{total}] Aşağıdaki metin, daha büyük bir Bağımsız Denetim Raporunun "
@@ -43,7 +30,7 @@ _SYNTH_EXCLUDE = {"analiz_suresi_saniye", "kullanilan_model", "is_mock_fallback"
 
 
 class BDRAnalyzer:
-    """SOLID Orchestrator: BDR risk analizi ve LLM provider orkestrasyon sınıfı."""
+    """SOLID Orchestrator & Strategy Facade: BDR risk analizi ve LLM provider orkestrasyon sınıfı."""
 
     def __init__(
         self,
@@ -52,8 +39,6 @@ class BDRAnalyzer:
         custom_user_template: Optional[str] = None,
         buyuk_girdi_stratejisi: str = "map_reduce",
     ):
-        # "map_reduce": yapı-farkında chunking + sentez (tam analiz, yavaş)
-        # "truncate": limit kadar kes, tek çağrı (model kıyaslama / hızlı)
         self.buyuk_girdi_stratejisi = buyuk_girdi_stratejisi
         if model_config is None:
             enabled = Config.get_enabled_models()
@@ -72,7 +57,7 @@ class BDRAnalyzer:
         self.api_key = Config.get_api_key_for_model(self.model_config)
         self.max_input_chars = int(
             self.model_config.get("max_input_chars")
-            or PROVIDER_INPUT_LIMITS.get(self.provider_name, DEFAULT_MAX_INPUT_CHARS)
+            or Config.PROVIDER_INPUT_LIMITS.get(self.provider_name, Config.DEFAULT_MAX_INPUT_CHARS)
         )
 
         # Markdown Prompt Yükleyici (PromptLoader) veya Dinamik Prompt Overrides
@@ -93,7 +78,7 @@ class BDRAnalyzer:
         ad = self.model_config.get("name", self.model_name)
 
         if self.buyuk_girdi_stratejisi == "truncate":
-            kes = min(self.max_input_chars, TRUNCATE_MAX_CHARS)
+            kes = min(self.max_input_chars, Config.TRUNCATE_MAX_CHARS)
             if len(bdr_text) <= kes:
                 report = self._run_provider(bdr_text)
                 report.kullanilan_model = ad
@@ -114,13 +99,13 @@ class BDRAnalyzer:
         return self.provider.analyze(self.user_template.format(bdr_text=bdr_text))
 
     def _analyze_chunked(self, bdr_text: str) -> BDRRiskAnalysisReport:
-        chunks = build_chunks(bdr_text, int(self.max_input_chars * CHUNK_UTILIZATION))
+        chunks = build_chunks(bdr_text, int(self.max_input_chars * Config.CHUNK_UTILIZATION))
         total = len(chunks)
         tasks = [
             CHUNK_INSTRUCTION.format(idx=i + 1, total=total, body=chunk)
             for i, chunk in enumerate(chunks)
         ]
-        with ThreadPoolExecutor(max_workers=min(total, MAX_CHUNK_WORKERS)) as executor:
+        with ThreadPoolExecutor(max_workers=min(total, Config.MAX_CHUNK_WORKERS)) as executor:
             partials = list(executor.map(self._run_provider, tasks))
 
         valid = [p for p in partials if not p.is_mock_fallback]
@@ -154,7 +139,7 @@ class BDRAnalyzer:
             if not synth.is_mock_fallback:
                 consolidated = synth.tespit_edilen_riskler
                 recovered = uncovered_risks(
-                    merged_risks, consolidated, api_key=os.getenv(EMBED_API_KEY_ENV)
+                    merged_risks, consolidated, api_key=os.getenv(Config.EMBED_API_KEY_ENV)
                 )
                 synth.tespit_edilen_riskler = consolidated + recovered
                 synth.komite_tavsiyesi_ve_sartlar = synth.komite_tavsiyesi_ve_sartlar or merged_terms
@@ -176,68 +161,16 @@ class BDRAnalyzer:
         return list(seen.values())
 
     def format_report_as_markdown(self, report: BDRRiskAnalysisReport) -> str:
-        lines = [
-            "# 📊 BDR Kredi Komitesi Risk Değerlendirme Raporu"
-        ]
-
-        if report.is_mock_fallback:
-            lines.extend([
-                "> [!WARNING]",
-                "> **MOCK FALLBACK UYARISI**: Bu rapor gerçek model API çağrısı sırasında hata alındığı için otomatik mock simülasyona düşmüştür.",
-                f"> **Hata Nedeni:** `{report.fallback_reason or 'API Çağrı Hatası'}`",
-                ""
-            ])
-
-        lines.extend([
-            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, Reasoning: `{self.model_config.get('reasoning_effort', 'medium')}`, Temp: `{self.model_config.get('temperature', 0.1)}`, Top-p: `{self.model_config.get('top_p', 0.9)}`)",
+        ust = [
+            f"**Model:** `{report.kullanilan_model}` (Prompt: `{self.prompt_file}`, "
+            f"Reasoning: `{self.model_config.get('reasoning_effort', 'medium')}`, "
+            f"Temp: `{self.model_config.get('temperature', 0.1)}`, "
+            f"Top-p: `{self.model_config.get('top_p', 0.9)}`)",
             f"**Analiz Süresi:** `{report.analiz_suresi_saniye} saniye`",
             f"**Firma Adı:** {report.firma_adi}",
             f"**Rapor Dönemi:** {report.rapor_donemi}",
             f"**Bağımsız Denetim Firması:** {report.denetim_firmasi or 'Belirtilmemiş'}",
             f"**Denetçi Görüşü:** `{report.denetci_gorusu.value if report.denetci_gorusu else 'Belirtilmemiş'}`",
             f"**Genel Karar Eğilimi:** `{report.karar_egilimi.value}`",
-            "",
-            "---",
-            "## 📌 1. Genel Kredi Risk Özeti",
-            report.genel_kredi_risk_ozeti,
-            "",
-            "---",
-            "## ⚠️ 2. Tespit Edilen Kalitatif Risk Kalemleri",
-            ""
-        ])
-
-        for idx, risk in enumerate(report.tespit_edilen_riskler, 1):
-            severity = {
-                RiskDerecesi.DUSUK: "🟢 Düşük",
-                RiskDerecesi.ORTA: "🟡 Orta",
-                RiskDerecesi.YUKSEK: "🔴 Yüksek",
-                RiskDerecesi.KRITIK: "🔥 Kritik"
-            }.get(risk.risk_derecesi, risk.risk_derecesi.value)
-
-            lines.extend([
-                f"### {idx}. {risk.baslik}",
-                f"- **Kategori:** `{risk.risk_kategorisi.value}`",
-                f"- **Dipnot Referansı:** `{risk.dipnot_referansi or 'BDR Genel'}`",
-                f"- **Risk Derecesi:** {severity}",
-                f"- **Tutar:** {risk.tutar_bilgisi or 'Belirtilmemiş'}",
-                f"- **Detay:** {risk.detay}",
-                f"- **Kredi Etkisi:** {risk.etki_degerlendirmesi}",
-                f"- **BDR Alıntısı:** *\"{risk.kaynak_metin_alintisi}\"*",
-                ""
-            ])
-
-        lines.extend([
-            "---",
-            "## 📋 3. Kredi Komitesi Tavsiyeleri & Şartlar",
-        ])
-        for sart in report.komite_tavsiyesi_ve_sartlar:
-            lines.append(f"- [ ] {sart}")
-
-        lines.extend([
-            "",
-            "---",
-            "## 📝 4. Analist Gerekçelendirme Metni",
-            report.analist_gerekce_metni
-        ])
-
-        return "\n".join(lines)
+        ]
+        return report_to_markdown(report, ust_satirlar=ust)

@@ -5,6 +5,8 @@ from finside.models.schemas import (
     KomiteKararEgilimi,
     BDRRiskItem,
     BDRRiskAnalysisReport,
+    BenchmarkRequest,
+    SidebarState,
 )
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     "KomiteKararEgilimi",
     "BDRRiskItem",
     "BDRRiskAnalysisReport",
+    "BenchmarkRequest",
+    "SidebarState",
 ]

@@ -1,6 +1,6 @@
 from typing import Dict, Any
 from finside.providers.base import BaseProvider
-from prompts.schemas import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport
 
 
 class MockProvider(BaseProvider):

@@ -5,7 +5,9 @@ from pathlib import Path
 
 from config import Config
 from finside.pipeline.state import PipelineState
+from finside.report_md import report_to_markdown
 from finside.writers import ReportWriter
+from finside.models import BDRRiskAnalysisReport
 
 _KARAKTER_PER_TOKEN = 4
 
@@ -41,5 +43,18 @@ def maliyet_ozetle(state: PipelineState) -> dict:
     nihai["pipeline_izi"] = izi
     ReportWriter.save_json(session_dir, "nihai_rapor.json", nihai)
     ReportWriter.save_json(session_dir, "pipeline_izi.json", izi)
+
+    rapor = BDRRiskAnalysisReport.model_validate(nihai)
+    ust = [
+        f"**Kaynak:** Multi-Agent Pipeline · `{rapor.kullanilan_model}`",
+        f"**Firma Adı:** {rapor.firma_adi}",
+        f"**Rapor Dönemi:** {rapor.rapor_donemi}",
+        f"**Bağımsız Denetim Firması:** {rapor.denetim_firmasi or 'Belirtilmemiş'}",
+        f"**Denetçi Görüşü:** `{rapor.denetci_gorusu.value if rapor.denetci_gorusu else 'Belirtilmemiş'}`",
+        f"**Genel Karar Eğilimi:** `{rapor.karar_egilimi.value}`",
+    ]
+    (session_dir / "nihai_rapor.md").write_text(
+        report_to_markdown(rapor, ust_satirlar=ust, pipeline_izi=izi), encoding="utf-8"
+    )
 
     return {"nihai_rapor": nihai, "maliyet_ozeti": izi}

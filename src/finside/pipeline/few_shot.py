@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from config import Config
-from prompts.schemas import RiskKategorisi
+from finside.models import RiskKategorisi
 
 ORNEK_KOKU = Config.BASE_DIR / "prompts" / "few_shot_examples"
 MAKS_ORNEK = 2

@@ -84,46 +84,36 @@ Arayüz tarayıcınızda otomatik olarak **`http://localhost:8501`** adresinde a
 ```
 Finside-AI/
 ├── README.md                  # Proje dokümantasyonu (Canlı Referans)
-├── app.py                     # Web Kullanıcı Arayüzü & Dinamik Prompt Düzenleyici
+├── app.py                     # Streamlit Web Arayüzü Ana Giriş Noktası
+├── run_poc.py                 # CLI Benchmark & Batch Çalıştırma Sürücüsü
 ├── run.ps1                    # PowerShell Tek Tıkla Kurulum ve Başlatma Betiği
+├── Dockerfile                 # Production Docker Img Yapılandırması
+├── .dockerignore              # Docker Build Kapsamı Dışındaki Dosyalar
+├── docker-compose.yml         # Opsiyonel Postgres Pipeline Checkpoint Servisi
 ├── .env.example               # SADECE API Key / Gizli Bilgiler Şablonu
-├── .gitignore                 # Git kapsamı dışındaki dosyalar (.venv, outputs vb.)
-├── config.json                # Tüm Açık & Kapalı Kaynak LLM Konfigürasyonu
-├── config.py                  # Konfigürasyon ve Env okuyucu
-├── requirements.txt           # Tüm Python Bağımlılıkları Listesi
-├── docs/
-│   ├── ARCHITECTURE.md        # Mevcut tek-model motoru: uçtan uca işleyiş & teknolojiler
-│   ├── PIPELINE_DESIGN.md     # Multi-agent LangGraph pipeline tasarımı (v0.2, uygulama bekliyor)
-│   ├── CHANGELOG.md           # Sürüm / değişiklik günlüğü
-│   └── BENCHMARK_RESEARCH.md  # Açık & Kapalı Kaynak LLM Benchmark Özet Raporu
-├── data/
-│   └── bdr_samples/           # BDR txt test verileri (Borusan 2024 BDR örneği dahil)
-├── prompts/
-│   ├── bdr_analyst_v1.md      # Dinamik Dipnot İçeren İyileştirilmiş BDR Prompt Şablonu
-│   └── schemas.py             # Pydantic Rapor Şemaları ve Esnek Enum Validator'ları
-├── src/
-│   └── finside/
-│       ├── loaders/           # Veri & Prompt Yükleyici Modülleri (SRP & DIP)
-│       │   ├── __init__.py
-│       │   ├── base_loader.py # BaseLoader Soyut Sınıfı
-│       │   ├── bdr_loader.py  # BDR Metin Yükleyici
-│       │   └── prompt_loader.py # Prompt Şablon Yükleyici
-│       ├── providers/         # SOLID Strategy & Factory LLM Sağlayıcı Modülleri
-│       │   ├── __init__.py
-│       │   ├── base.py        # BaseProvider — token bütçesi, JSON çıkarma & kesik JSON onarımı
-│       │   ├── gemini_provider.py       # response_schema + thinking_config
-│       │   ├── openai_provider.py       # beta.chat.completions.parse + TPM kurtarma
-│       │   ├── anthropic_provider.py    # forced tool-use + streaming + model fallback
-│       │   ├── huggingface_provider.py  # serverless router + streaming + model fallback
-│       │   ├── mock_provider.py         # deterministik simülasyon / fallback
-│       │   └── factory.py     # ProviderFactory Fabrika Sınıfı
-│       ├── writers/           # Dosya I/O & Rapor Yazıcı Modülleri
-│       │   ├── __init__.py
-│       │   └── report_writer.py
-│       ├── chunking.py        # Yapı-farkında bölümleme (dipnot/başlık sınırları)
-│       ├── dedupe.py          # Sentez sonrası embedding tabanlı kapsama koruması
-│       ├── analyzer.py        # SOLID Orchestrator — tek-çağrı / map-reduce kararı
-│       └── __init__.py
-├── outputs/                   # Tarih ve saat bazlı hiyerarşik klasörler
-└── run_poc.py                 # CLI orkestratör betiği
+├── .gitignore                 # Git Kapsamı Dışındaki Dosyalar
+├── config.json                # Tüm Açık & Kapalı Kaynak LLM Yapılandırmaları
+├── config.py                  # Merkezi Konfigürasyon ve Eşik Değerleri (Single Source of Truth)
+├── requirements.txt           # Python Bağımlılıkları Listesi
+├── docs/                      # Mimari ve Tasarım Dokümanları
+├── data/bdr_samples/          # Örnek BDR Metin Verileri
+├── prompts/                   # Markdown Prompt Şablonları
+└── src/finside/
+    ├── models/                # Pydantic Veri Şemaları ve Dataclass Modelleri
+    │   ├── __init__.py
+    │   └── schemas.py         # BDRRiskAnalysisReport, BenchmarkRequest vb.
+    ├── services/              # İş Mantığı & Servis Katmanı
+    │   ├── __init__.py
+    │   └── benchmark_service.py # Paralel Model Benchmark Orkestrasyonu
+    ├── ui/                    # Modüler UI Bileşenleri
+    │   ├── __init__.py
+    │   ├── sidebar.py         # Yan Kontrol Paneli
+    │   └── tabs.py            # Görsel Sekme Bileşenleri & Kullanım Rehberi
+    ├── loaders/               # BDR ve Prompt Yükleyiciler (DIP & SRP)
+    ├── providers/             # LLM Sağlayıcı Stratejileri (Gemini, OpenAI, Claude, HF, Mock)
+    ├── writers/               # Rapor ve Metrik Yazıcı Modülleri
+    ├── chunking.py            # Yapı-Farkında Metin Bölümleme
+    ├── dedupe.py              # Risk Tekleştirme
+    ├── analyzer.py            # BDR Risk Analiz Orkestratörü
+    └── report_md.py           # Rapor → Markdown Dönüştürücü
 ```
