@@ -9,21 +9,7 @@ from finside.dedupe import uncovered_risks
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
 from finside.report_md import report_to_markdown
-from prompts.schemas import BDRRiskAnalysisReport, BDRRiskItem
-
-EMBED_API_KEY_ENV = "OPENAI_API_KEY"
-
-DEFAULT_MAX_INPUT_CHARS = 150_000
-PROVIDER_INPUT_LIMITS = {
-    "huggingface": 90_000,
-    "openai": 200_000,
-    "anthropic": 200_000,
-    "gemini": 200_000,
-    "mock": 5_000_000,
-}
-CHUNK_UTILIZATION = 0.9
-MAX_CHUNK_WORKERS = 4
-TRUNCATE_MAX_CHARS = 60_000  # kıyas modunda: bir modeli değerlendirmek için yeterli dilim
+from finside.models import BDRRiskAnalysisReport, BDRRiskItem
 
 CHUNK_INSTRUCTION = (
     "[BDR PARÇA {idx}/{total}] Aşağıdaki metin, daha büyük bir Bağımsız Denetim Raporunun "
@@ -44,7 +30,7 @@ _SYNTH_EXCLUDE = {"analiz_suresi_saniye", "kullanilan_model", "is_mock_fallback"
 
 
 class BDRAnalyzer:
-    """SOLID Orchestrator: BDR risk analizi ve LLM provider orkestrasyon sınıfı."""
+    """SOLID Orchestrator & Strategy Facade: BDR risk analizi ve LLM provider orkestrasyon sınıfı."""
 
     def __init__(
         self,
@@ -53,8 +39,6 @@ class BDRAnalyzer:
         custom_user_template: Optional[str] = None,
         buyuk_girdi_stratejisi: str = "map_reduce",
     ):
-        # "map_reduce": yapı-farkında chunking + sentez (tam analiz, yavaş)
-        # "truncate": limit kadar kes, tek çağrı (model kıyaslama / hızlı)
         self.buyuk_girdi_stratejisi = buyuk_girdi_stratejisi
         if model_config is None:
             enabled = Config.get_enabled_models()
@@ -73,7 +57,7 @@ class BDRAnalyzer:
         self.api_key = Config.get_api_key_for_model(self.model_config)
         self.max_input_chars = int(
             self.model_config.get("max_input_chars")
-            or PROVIDER_INPUT_LIMITS.get(self.provider_name, DEFAULT_MAX_INPUT_CHARS)
+            or Config.PROVIDER_INPUT_LIMITS.get(self.provider_name, Config.DEFAULT_MAX_INPUT_CHARS)
         )
 
         # Markdown Prompt Yükleyici (PromptLoader) veya Dinamik Prompt Overrides
@@ -94,7 +78,7 @@ class BDRAnalyzer:
         ad = self.model_config.get("name", self.model_name)
 
         if self.buyuk_girdi_stratejisi == "truncate":
-            kes = min(self.max_input_chars, TRUNCATE_MAX_CHARS)
+            kes = min(self.max_input_chars, Config.TRUNCATE_MAX_CHARS)
             if len(bdr_text) <= kes:
                 report = self._run_provider(bdr_text)
                 report.kullanilan_model = ad
@@ -115,13 +99,13 @@ class BDRAnalyzer:
         return self.provider.analyze(self.user_template.format(bdr_text=bdr_text))
 
     def _analyze_chunked(self, bdr_text: str) -> BDRRiskAnalysisReport:
-        chunks = build_chunks(bdr_text, int(self.max_input_chars * CHUNK_UTILIZATION))
+        chunks = build_chunks(bdr_text, int(self.max_input_chars * Config.CHUNK_UTILIZATION))
         total = len(chunks)
         tasks = [
             CHUNK_INSTRUCTION.format(idx=i + 1, total=total, body=chunk)
             for i, chunk in enumerate(chunks)
         ]
-        with ThreadPoolExecutor(max_workers=min(total, MAX_CHUNK_WORKERS)) as executor:
+        with ThreadPoolExecutor(max_workers=min(total, Config.MAX_CHUNK_WORKERS)) as executor:
             partials = list(executor.map(self._run_provider, tasks))
 
         valid = [p for p in partials if not p.is_mock_fallback]
@@ -155,7 +139,7 @@ class BDRAnalyzer:
             if not synth.is_mock_fallback:
                 consolidated = synth.tespit_edilen_riskler
                 recovered = uncovered_risks(
-                    merged_risks, consolidated, api_key=os.getenv(EMBED_API_KEY_ENV)
+                    merged_risks, consolidated, api_key=os.getenv(Config.EMBED_API_KEY_ENV)
                 )
                 synth.tespit_edilen_riskler = consolidated + recovered
                 synth.komite_tavsiyesi_ve_sartlar = synth.komite_tavsiyesi_ve_sartlar or merged_terms

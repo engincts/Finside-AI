@@ -2,7 +2,7 @@
 
 from typing import List
 
-from prompts.schemas import BDRRiskAnalysisReport, DenetciGorusTuru, KomiteKararEgilimi, RiskDerecesi
+from finside.models import BDRRiskAnalysisReport, DenetciGorusTuru, KomiteKararEgilimi, RiskDerecesi
 
 _DOGRULANMAMIS_ESIGI = 0.30
 _BOS_RISK_SEGMENT_ESIGI = 20

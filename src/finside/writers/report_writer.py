@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 from config import Config
-from prompts.schemas import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport
 
 
 class ReportWriter:

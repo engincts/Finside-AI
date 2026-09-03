@@ -3,9 +3,9 @@ from typing import Any
 
 
 class BaseLoader(ABC):
-    """SOLID Dependency Inversion: Tüm Veri ve Prompt Yükleyicileri için Soyut Taban Sınıf."""
+    """SOLID Dependency Inversion (DIP): Tüm veri ve dosya yükleyiciler için soyut taban sınıfı."""
 
     @abstractmethod
-    def load() -> Any:
-        """Veri veya dosya yükleme metodunu tanımlar."""
+    def load(self) -> Any:
+        """Veri veya dosya yükleme metodunu çalıştırır ve yüklenen nesneyi döndürür."""
         pass

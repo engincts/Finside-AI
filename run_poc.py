@@ -15,9 +15,10 @@ sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "src"))
 
 from config import Config
-from finside.loaders import BDRLoader
+from finside.loaders import BDRLoader, PromptLoader
 from finside.writers import ReportWriter
 from finside.analyzer import BDRAnalyzer
+from finside.services.benchmark_service import BenchmarkService
 
 
 def main():
@@ -69,53 +70,30 @@ def main():
 
     # 3. Model Listesini Belirle
     if args.model_id:
-        target = Config.get_model_by_id(args.model_id)
-        if not target:
-            print(f"❌ Model ID bulunamadı: {args.model_id}")
-            sys.exit(1)
-        models_to_run = [target]
+        selected_model_ids = [args.model_id]
     else:
-        models_to_run = Config.get_enabled_models()
-        if not models_to_run:
+        enabled_models = Config.get_enabled_models()
+        if enabled_models:
+            selected_model_ids = [m["id"] for m in enabled_models]
+        else:
             print("⚠️ 'enabled: true' model bulunamadı, Mock mod çalıştırılıyor...")
-            models_to_run = [{"id": "mock", "name": "Mock Test Modeli", "provider": "mock", "model_name": "mock-v1"}]
+            selected_model_ids = ["mock"]
 
-    summary_results = []
+    from finside.models import BenchmarkRequest
 
-    # 4. Modelleri Çalıştır (BDRAnalyzer) & Raporları Kaydet (writers.ReportWriter)
-    for model_cfg in models_to_run:
-        model_id = model_cfg.get("id")
-        model_name = model_cfg.get("name")
-        print(f"\n🔄 Model Çalıştırılıyor: [{model_id}] {model_name}...")
+    req = BenchmarkRequest(
+        selected_model_ids=selected_model_ids,
+        bdr_content=bdr_info["content"],
+        bdr_name=input_path.name,
+        is_mock_mode=args.mock,
+    )
 
-        if args.mock:
-            model_cfg["provider"] = "mock"
+    # 4. Modelleri BenchmarkService İle Çalıştır
+    results_list, summary_results, timeouts, session_dir = BenchmarkService.run_benchmark_suite(req)
 
-        analyzer = BDRAnalyzer(model_config=model_cfg)
-        report = analyzer.analyze(bdr_info["content"])
-        md_content = analyzer.format_report_as_markdown(report)
+    relative_session_path = session_dir.relative_to(Config.BASE_DIR)
 
-        ReportWriter.save_model_report(session_dir, model_id, report, md_content)
-
-        summary_results.append({
-            "model_id": model_id,
-            "model_name": model_name,
-            "provider": model_cfg.get("provider"),
-            "duration_sec": report.analiz_suresi_saniye,
-            "is_mock_fallback": report.is_mock_fallback,
-            "fallback_reason": report.fallback_reason,
-            "risk_count": len(report.tespit_edilen_riskler),
-            "karar_egilimi": report.karar_egilimi.value,
-            "denetci_gorusu": report.denetci_gorusu.value if report.denetci_gorusu else None
-        })
-
-        status_str = "⚠️ Fallback (Mock)" if report.is_mock_fallback else "✅ Gerçek API"
-        print(f"  {status_str} — Rapor Oluşturuldu: {relative_session_path}/{model_id}_report.md (Süre: {report.analiz_suresi_saniye:.2f}s)")
-
-    # 5. Özet Performans Metriklerini Kaydet (writers.ReportWriter)
-    ReportWriter.save_summary_metrics(session_dir, input_stem, summary_results)
-
-    # 6. Terminal Özet Görünümü
+    # 5. Terminal Özet Görünümü
     print("\n" + "=" * 80)
     print("📊 MODEL KARŞILAŞTIRMA & PERFORMANS METRİKLERİ ÖZETİ")
     print("=" * 80)

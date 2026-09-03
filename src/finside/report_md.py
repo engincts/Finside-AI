@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from prompts.schemas import BDRRiskAnalysisReport, RiskDerecesi
+from finside.models import BDRRiskAnalysisReport, RiskDerecesi
 
 _DERECE_ROZET = {
     RiskDerecesi.DUSUK: "🟢 Düşük",

@@ -7,7 +7,7 @@ from config import Config
 from finside.pipeline.state import PipelineState
 from finside.report_md import report_to_markdown
 from finside.writers import ReportWriter
-from prompts.schemas import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport
 
 _KARAKTER_PER_TOKEN = 4
 

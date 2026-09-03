@@ -6,7 +6,7 @@ kural-tabanlı ön-filtre hali. Tek kaynak burada tutulur.
 
 from typing import Optional
 
-from prompts.schemas import RiskKategorisi
+from finside.models import RiskKategorisi
 
 KATEGORI_ANAHTARLARI = {
     RiskKategorisi.FAALIYET_SUREKLILIGI_VE_SONRAKI_OLAYLAR: [

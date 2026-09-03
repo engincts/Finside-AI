@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, List
 from finside.providers.base import BaseProvider
-from prompts.schemas import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport
 
 try:
     from huggingface_hub import InferenceClient
@@ -24,9 +24,9 @@ class HuggingFaceProvider(BaseProvider):
 
     def analyze(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
-            return self.generate_mock_report(user_prompt, is_fallback=True, reason=f"HF_TOKEN bulunamadı ({self.model_name}).")
+            raise RuntimeError(f"❌ HF_TOKEN eksik ({self.model_name}). Lütfen .env dosyanızı veya API anahtarınızı kontrol edin.")
         if not HAS_HUGGINGFACE:
-            return self.generate_mock_report(user_prompt, is_fallback=True, reason="huggingface_hub paketi yüklü değil.")
+            raise RuntimeError("❌ huggingface_hub paketi yüklü değil. Lütfen `pip install huggingface_hub` çalıştırın.")
 
         schema_str = json.dumps(BDRRiskAnalysisReport.model_json_schema(), ensure_ascii=False)
         strict_system_prompt = (
@@ -36,18 +36,34 @@ class HuggingFaceProvider(BaseProvider):
             f"JSON Schema:\n{schema_str}"
         )
 
-        # Denenecek model isimleri sırası (İstenen Model -> Lider HF Serverless Modeller)
-        models_to_try = [self.model_name] + [m for m in self.FALLBACK_MODELS if m != self.model_name]
-        last_error = None
+        try:
+            client = InferenceClient(model=self.model_name, token=self.api_key)
+            raw_text = None
 
-        for current_model in models_to_try:
             try:
-                client = InferenceClient(model=current_model, token=self.api_key)
+                # 1. Deneme: Chat completion streaming
+                stream = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": strict_system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                    stream=True,
+                )
+                raw_text = "".join(
+                    (part.choices[0].delta.content or "")
+                    for part in stream
+                    if part.choices
+                )
+            except Exception:
                 raw_text = None
 
-                # 1. Deneme: Chat Completion API (Task: conversational)
+            # 2. Deneme: Chat completion non-streaming
+            if not raw_text:
                 try:
-                    stream = client.chat.completions.create(
+                    comp = client.chat.completions.create(
                         messages=[
                             {"role": "system", "content": strict_system_prompt},
                             {"role": "user", "content": user_prompt}
@@ -55,56 +71,35 @@ class HuggingFaceProvider(BaseProvider):
                         max_tokens=self.max_tokens,
                         temperature=self.temperature,
                         top_p=self.top_p,
-                        stream=True,
+                        stream=False,
                     )
-                    raw_text = "".join(
-                        (part.choices[0].delta.content or "")
-                        for part in stream
-                        if part.choices
+                    if comp and comp.choices and comp.choices[0].message:
+                        raw_text = comp.choices[0].message.content
+                except Exception:
+                    pass
+
+            # 3. Deneme: Text generation API
+            if not raw_text:
+                try:
+                    prompt_formatted = f"System: {strict_system_prompt}\nUser: {user_prompt}\nAssistant:"
+                    raw_text = client.text_generation(
+                        prompt=prompt_formatted,
+                        max_new_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
                     )
-                except Exception as chat_err:
-                    chat_err_str = str(chat_err).lower()
-                    # Eğer "not a chat model" veya "not supported" ise text_generation dene veya sonraki modele geç
-                    if "not a chat model" in chat_err_str:
-                        prompt_formatted = f"System: {strict_system_prompt}\nUser: {user_prompt}\nAssistant:"
-                        try:
-                            raw_text = client.text_generation(
-                                prompt=prompt_formatted,
-                                max_new_tokens=self.max_tokens,
-                                temperature=self.temperature,
-                                top_p=self.top_p,
-                            )
-                        except Exception:
-                            raise chat_err
-                    else:
-                        raise chat_err
+                except Exception as text_err:
+                    raise RuntimeError(f"HuggingFace modellerinden yanıt alınamadı: {text_err}")
 
-                if raw_text:
-                    report = self._parse_report(raw_text)
-                    report.is_mock_fallback = False
-                    
-                    # Eğer fallback model kullanıldıysa kullanıcıyı şeffaf bilgilendir
-                    if current_model != self.model_name:
-                        report.kullanilan_model = f"{self.model_name} (HF Serverless Auto-Fallback: {current_model})"
-                    return report
+            if raw_text and raw_text.strip():
+                report = self._parse_report(raw_text)
+                report.is_mock_fallback = False
+                return report
+            else:
+                raise RuntimeError("HuggingFace modelinden boş yanıt döndü.")
 
-            except Exception as err:
-                last_error = err
-                err_str = str(err).lower()
-                
-                # Eğer model barındırılmıyorsa / sohbet modeli değilse / 404 ise sıradaki modele geç
-                if any(k in err_str for k in [
-                    "model_not_supported", "not supported by any provider", 
-                    "not a chat model", "404", "not found", "invalid_request_error"
-                ]):
-                    continue
-                else:
-                    # Kota aşımı (402) veya yetki hatası (401) durumunda döngüyü sonlandır
-                    break
-
-        err_msg = f"HuggingFace API Hata ({self.model_name}): {last_error}"
-        print(f"[HATA] {err_msg}")
-        return self.generate_mock_report(user_prompt, is_fallback=True, reason=err_msg)
+        except Exception as err:
+            raise RuntimeError(f"❌ HuggingFace API Hatası ({self.model_name}): {err}")
 
     def raw_generate(self, user_prompt: str, *, json_mode: bool = False) -> str:
         if not self.api_key:

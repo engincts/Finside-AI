@@ -2,18 +2,19 @@ import json
 import re
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
-from prompts.schemas import BDRRiskAnalysisReport, DenetciGorusTuru, KomiteKararEgilimi, BDRRiskItem, RiskKategorisi, RiskDerecesi
+from config import Config
+from finside.models import (
+    BDRRiskAnalysisReport,
+    DenetciGorusTuru,
+    KomiteKararEgilimi,
+    BDRRiskItem,
+    RiskKategorisi,
+    RiskDerecesi,
+)
 
 
 class BaseProvider(ABC):
     """SOLID Dependency Inversion & Open/Closed Principle: Soyut LLM Sağlayıcı Sınıfı."""
-
-    EFFORT_TOKEN_MAP = {
-        "low": 2048,
-        "medium": 4096,
-        "high": 8192,
-        "auto": 8192
-    }
 
     def __init__(self, model_config: Dict[str, Any], system_prompt: str, api_key: str):
         self.model_config = model_config
@@ -25,8 +26,8 @@ class BaseProvider(ABC):
         self.repetition_penalty = model_config.get("repetition_penalty", 1.0)
         self.reasoning_effort = model_config.get("reasoning_effort", "high")
         
-        # Max Tokens Override (Default 8192 or model specific)
-        default_tokens = self.EFFORT_TOKEN_MAP.get(str(self.reasoning_effort).lower(), 8192)
+        # Max Tokens Override (Default from Config.EFFORT_TOKEN_MAP or model specific)
+        default_tokens = Config.EFFORT_TOKEN_MAP.get(str(self.reasoning_effort).lower(), 8192)
         self.max_tokens = model_config.get("max_tokens", default_tokens)
 
     @abstractmethod
