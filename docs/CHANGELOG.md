@@ -13,11 +13,18 @@ Borusan BDR ve kurumsal kredi tahsis raporlama gereksinimleri doğrultusunda sis
 - **Şema & Pydantic Güvenilirliği (`schemas.py`)**:
   - `FinansalRasyoOzeti` Pydantic sınıfı oluşturularak OpenAI Strict Mode ve Gemini REST payload `Dict[str, Any]` ek parametre reddi hataları önlendi.
   - Açık kaynak modellerin (Qwen, Llama vb.) eksik/boş bıraktığı JSON alanları için `fallback_kaynak_alintisi` ve `normalize_risk_derecesi` pre-validator'ları eklendi.
-- **Oturum İçi Config Önbelleği & UI İyileştirmeleri (`config.py`, `tabs.py`, `sidebar.py`)**:
+- **Faz 6.5 — Sanitizer Ajanı Entegrasyonu (`sanitizer.py`, `synthesis.py`)**:
+  - Sentez adımı öncesinde çalışan ultra-hızlı `Sanitizer Agent (Risk Filtreleme Ajanı)` eklendi. Uzlaştırılmış risk listesindeki özgün kısıt taşımayan salt bilanço bakiyelerini (örn: 'Nakit ve Nakit Benzerleri') ve jenerik şablon etki cümleli tekrarları süzerek temizleyen bağımsız LLM filtre adımı devreye alındı.
+
   - Streamlit UI'da `AttributeError: type object 'Config' has no attribute '_config_data'` hatasını çözmek için `_config_data` in-memory önbelleği ve `Config.update_pipeline_config()` metodu eklendi.
   - Multi-Agent Pipeline sekmesinde Reconciler, Critic ve Synthesis model seçim kutularının altına ne iş yaptıklarını açıklayan `st.caption` açıklamaları ve `help` bilgi ipuçları eklendi.
-- **Kurumsal Banka Kredi Komitesi Rapor Formatı (`report_md.py`)**:
-  - Rapor çıktısı ham AI dökümünden çıkarılıp üst düzey banka raporu formatına dönüştürüldü: `> [!IMPORTANT]` karar özet kartı, `Kredi Tahsis & Teklif Çerçevesi` tablosu, `Risk Dağılım Matrisi & Finansal Özet Tablosu`, ve kategorilerine göre gruplanmış risk klasörleri (`📂 Teminat ve TRİ Yükleri`, `📂 Kur ve Faiz Riskleri` vb.).
+- **SORUN 2D Çözümü — Critic Tekrar/Jenerik Risk Elemesi (`dedupe.py`)**:
+  - `jenerik_ve_tekrarlayan_ele` fonksiyonu eklendi. Aynı kategoride hem jenerik/sözde başlık (örn: 'Kur Riski', 'Likidite Riski', 'Kıdem Tazminatı') hem de dipnot referanslı/spesifik başlık (örn: 'Dipnot 35 - Net YP Pozisyonu ve Kur Riski') bulunduğunda, jenerik olan elenerek kaynak modelleri spesifik kaleme aktarıldı.
+- **SORUN 3 Çözümü — 'Risk ≠ Bilanço Kalemi' & Şablon Cümle Yasağı (`bdr_analyst_v1.md`, `synthesis_v1.md`, `qa_rules.py`)**:
+  - Promptlarda `etki_degerlendirmesi` alanına "Borç ödeme kapasitesi üzerindeki olası etki" gibi jenerik şablon cümlelerin yazılması kesin olarak yasaklandı.
+  - Sadece bakiye bildiren (risk mekanizması taşımayan) salt bilanço/muhasebe kalemlerinin risk listesine alınmaması ilkesi sıkılaştırıldı.
+  - `qa_rules.py` içerisine jenerik etki cümlesi tekrarı (3+ kalem) tespit eden otomatik QA bayrağı eklendi.
+
   - `Analiz Süresi: None saniye` biçimlendirme hatası `report_md.py` içinde `sure_str` kontrolü ile `Tamamlandı` veya hassas saniye formatına çevrildi.
 - **Deduplikasyon regex Başlık Temizliği (`reconciler.py`)**:
   - `_DIPNOT_PREFIX_RE` regex entegre edilerek `Dipnot 7 - Kısa Vadeli Borçlanmalar` ile `Kısa Vadeli Borçlanmalar` gibi aynı konulu tekrarlayan başlıkların tekil kaleme uzlaştırılması sağlandı.

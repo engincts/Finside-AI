@@ -14,6 +14,7 @@ PIPELINE_DEFAULTS: Dict[str, Any] = {
     "triage_model": "gpt-4o-mini",
     "reconciler_model": "claude-sonnet-4-5",
     "critic_model": "gemini-3.6-flash",
+    "sanitizer_model": "gemini-3.6-flash",
     "synthesis_model": "claude-sonnet-4-5",
     "segmenter_fallback_model": "gemini-3.6-flash",
     "segmenter_guven_esigi": 0.6,
@@ -90,7 +91,13 @@ class Config:
         return cls._config_data
 
     @classmethod
-    def update_pipeline_config(cls, reconciler: Optional[str] = None, critic: Optional[str] = None, synthesis: Optional[str] = None) -> None:
+    def update_pipeline_config(
+        cls,
+        reconciler: Optional[str] = None,
+        critic: Optional[str] = None,
+        sanitizer: Optional[str] = None,
+        synthesis: Optional[str] = None,
+    ) -> None:
         cfg = cls.load_config()
         if "pipeline" not in cfg:
             cfg["pipeline"] = {}
@@ -98,6 +105,8 @@ class Config:
             cfg["pipeline"]["reconciler_model"] = reconciler
         if critic:
             cfg["pipeline"]["critic_model"] = critic
+        if sanitizer:
+            cfg["pipeline"]["sanitizer_model"] = sanitizer
         if synthesis:
             cfg["pipeline"]["synthesis_model"] = synthesis
 

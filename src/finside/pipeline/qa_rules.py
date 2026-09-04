@@ -40,4 +40,17 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
             f"{segment_sayisi} segment işlendi ama hiç risk bulunamadı — olası pipeline hatası."
         )
 
+    # Jenerik Şablon Etki Cümlesi Tekrarı Kontrolü (Regex + Somutluk Süzgeci)
+    from finside.dedupe import _is_jenerik_etki
+    if riskler:
+        jenerik_etki_sayisi = sum(
+            1 for r in riskler
+            if _is_jenerik_etki(r.etki_degerlendirmesi or "")
+        )
+        if jenerik_etki_sayisi >= 3:
+            bayraklar.append(
+                f"Tespit edilen risklerin {jenerik_etki_sayisi} tanesinde jenerik/şablon etki cümlesi "
+                "(somut gerekçesi olmayan 'Borç ödeme kapasitesi üzerindeki olası etki' vb.) tespit edildi."
+            )
+
     return bayraklar

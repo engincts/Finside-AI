@@ -42,7 +42,7 @@ def render_overview_tab(bdr_name: str, is_mock_mode: bool):
           1. ✂️ **Segmentasyon (Segmenting):** 200+ sayfalık dev BDR raporu dipnot ve finansal tablo sınırlarına göre mantıksal bölümlere ayrılır.
           2. 🎯 **Triyaj (Triage):** Metin parçaları taranarak risk taşıma ihtimali yüksek kilit dipnotlar önceliklendirilir.
           3. 🗺️ **Ensemble Map (Çoklu Model Çıkarımı):** Seçilen uzman modeller (Gemini, GPT-4o, DeepSeek, Qwen vb.) eşzamanlı çalışarak ham risk bulgularını ve dipnot alıntılarını toplar.
-          4. 🔍 **Grounding / Uzlaştırma / Critic (Doğrulama & Eleştiri):** Üretilen alıntılar ham BDR metninde 3 katmanlı motorla doğrulanır (`Grounding`), modeller arasındaki çelişkiler giderilir (`Uzlaştırma`) ve eleştirmen ajan (`Critic`) uydurma bilgi kontrolü yapar.
+          4. 🔍 **Grounding / Uzlaştırma / Critic / Sanitizer (Doğrulama, Eleştiri & Temizlik):** Üretilen alıntılar ham BDR metninde 3 katmanlı motorla doğrulanır (`Grounding`), modeller arasındaki çelişkiler giderilir (`Uzlaştırma`), eleştirmen ajan (`Critic`) eksik dipnot taraması yapar ve temizlik ajanı (`Sanitizer`) jenerik etki cümlelerini ile risk içermeyen salt bilanço kalemlerini rapordan temizler.
           5. 🧩 **Sentez (Synthesis):** Tüm doğrulanmış riskler, finansal rasyolar ve komite kararları tek bir **Nihai Kredi Komitesi Raporu** halinde birleştirilir.
           6. 🛡️ **QA Kontrolü (Quality Assurance):** Kural tabanlı mantık denetimi yapılarak çelişkili komite kararları ve eksik alanlar son kez kontrol edilir.
 
@@ -51,7 +51,7 @@ def render_overview_tab(bdr_name: str, is_mock_mode: bool):
         - 🎯 **Numerical Fingerprinting (Sayısal İmza Motoru):** BDR dipnotlarındaki 4+ haneli tutarları (TL/USD/EUR) ve rakamları regex ile kanonik forma indirgeyerek %100 rakamsal doğruluk denetimi yapar.
         - ⚡ **RapidFuzz Lexical Engine:** Türkçe çoğul ekleri (-lar/-ler) ve yazım varyasyonlarına takılmadan başlık bazlı bulanık metin eşleştirmesi yapar.
         - 🔍 **Multi-Layer Hybrid Grounding Engine:** Üretilen her iddianın ham BDR metnindeki dipnot parçalarıyla uyuşup uyuşmadığını 3 katmanlı doğrulama ile denetler.
-        - 🛡️ **Post-Hoc Reconciler Guard:** LLM uzlaştırma adımından sonra kod seviyesinde özet/roll-up eleme filtresi uygulayarak mükemmel kaliteyi garanti eder.
+        - 🛡️ **Post-Hoc Reconciler Guard & Sanitizer Agent:** LLM uzlaştırma adımından sonra kod seviyesinde özet/roll-up eleme filtresi ve Regex + LLM Sanitizer Süzgeci uygulayarak jenerik/şablon cümleleri eler ve mükemmel kaliteyi garanti eder.
         """)
 
     if st.session_state.analysis_results:
@@ -236,10 +236,12 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         for uyari in _deg[mid]["uyarilar"]:
             st.caption(f"⚠️ {mid}: {uyari}")
 
-    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Reconciler / Critic / Sentez Modelleri)"):
-        st.caption("Uzlaştırma, Eleştirmen (Critic) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
+    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
+        st.caption("Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
         r_idx = model_secenekleri.index(pipeline_cfg.get("reconciler_model")) if pipeline_cfg.get("reconciler_model") in model_secenekleri else 0
         c_idx = model_secenekleri.index(pipeline_cfg.get("critic_model")) if pipeline_cfg.get("critic_model") in model_secenekleri else 0
+        san_default = pipeline_cfg.get("sanitizer_model", pipeline_cfg.get("critic_model"))
+        san_idx = model_secenekleri.index(san_default) if san_default in model_secenekleri else 0
         s_idx = model_secenekleri.index(pipeline_cfg.get("synthesis_model")) if pipeline_cfg.get("synthesis_model") in model_secenekleri else 0
 
         pipe_reconciler = st.selectbox(
@@ -258,6 +260,14 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         )
         st.caption("💡 **Eleştirmen Ajanı:** Bulguları BDR orijinal metniyle grounding testine tabi tutar, kanıtsız riskleri geri çevirir.")
 
+        pipe_sanitizer = st.selectbox(
+            "🧹 Temizlik (Sanitizer) Modeli",
+            options=model_secenekleri,
+            index=san_idx,
+            help="Jenerik etki cümlelerini ve risk mekanizması içermeyen yalın bilanço kalemlerini süzen hızlı filtre ajanı."
+        )
+        st.caption("💡 **Temizlik Ajanı:** Jenerik/şablon cümleleri somut etki analizleriyle günceller ve salt bilanço bakiyelerini rapordan temizler.")
+
         pipe_synthesis = st.selectbox(
             "🧩 Sentez (Synthesis) Modeli",
             options=model_secenekleri,
@@ -270,6 +280,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         Config.update_pipeline_config(
             reconciler=pipe_reconciler,
             critic=pipe_critic,
+            sanitizer=pipe_sanitizer,
             synthesis=pipe_synthesis,
         )
 

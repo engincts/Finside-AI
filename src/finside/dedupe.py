@@ -120,14 +120,74 @@ def _local_text_similarity(t1: str, t2: str) -> float:
         return jaccard
 
 
+_JENERIK_PATTERN = re.compile(
+    r"(borç\s+ödeme|likidite|finansal\s+durum|kapasitesi?|faaliyet|performans)"
+    r".*(olası|etki|yansı|sonuç|değerlendir|baskı)",
+    re.IGNORECASE | re.DOTALL
+)
+
+
+def _is_jenerik_etki(etki: str) -> bool:
+    if not etki:
+        return True
+    etki_clean = etki.strip().lower()
+    if len(etki_clean) < 20:
+        return True
+    has_specifics = bool(re.search(r"\d|yüzde|%|ipotek|rehin|kefalet|dava|hedg|kambiyo|vergi|karşılık|bulaşma|türev", etki_clean))
+    if _JENERIK_PATTERN.search(etki_clean) and not has_specifics:
+        return True
+    return False
+
+
+def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
+    """Aynı kategoride daha spesifik (dipnot referanslı veya özgün etki açıklamalı) kalem varken,
+    jenerik/sözde (örn: 'Kur Riski', 'Likidite Riski', 'Kıdem Tazminatı') ve şablon etki cümleli
+    tekrarlayan kalemleri eler ve kaynak modellerini spesifik kaleme aktarır.
+    """
+    if len(riskler) < 2:
+        return list(riskler)
+
+    elenen_indeksler = set()
+    for i, risk in enumerate(riskler):
+        if i in elenen_indeksler:
+            continue
+        kat = risk.get("risk_kategorisi")
+        baslik = _norm(risk.get("baslik") or "")
+        etki = risk.get("etki_degerlendirmesi") or ""
+        is_jenerik = _is_jenerik_etki(etki) or not risk.get("tutar_bilgisi") or "Tutarsız" in str(risk.get("tutar_bilgisi")) or "Belirtilmemiş" in str(risk.get("tutar_bilgisi"))
+
+        for j, diger in enumerate(riskler):
+            if i == j or j in elenen_indeksler:
+                continue
+            diger_kat = diger.get("risk_kategorisi")
+            if kat and diger_kat == kat:
+                diger_baslik = _norm(diger.get("baslik") or "")
+                diger_etki = diger.get("etki_degerlendirmesi") or ""
+                diger_jenerik = _is_jenerik_etki(diger_etki)
+                diger_spesifik = not diger_jenerik or bool(diger.get("dipnot_referansi"))
+
+                is_overlap = (baslik in diger_baslik or diger_baslik in baslik)
+                is_generic_vs_specific = is_jenerik and diger_spesifik and (is_overlap or not risk.get("dipnot_referansi"))
+
+                if is_generic_vs_specific:
+                    diger["kaynak_modeller"] = sorted(
+                        set(diger.get("kaynak_modeller", [])) | set(risk.get("kaynak_modeller", []))
+                    )
+                    elenen_indeksler.add(i)
+                    break
+
+    return [r for i, r in enumerate(riskler) if i not in elenen_indeksler]
+
+
 def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List[dict]:
-    """Faz 7 global dedup: önce deterministik roll-up elenmesi, başlık eşleşmesi, sonra embedding / yerel anlamsal yakın-tekrar birleştirme.
+    """Faz 7 global dedup: önce deterministik roll-up ve jenerik tekrar elenmesi, başlık eşleşmesi, sonra embedding / yerel anlamsal yakın-tekrar birleştirme.
 
     Birleştirilen kalemlerin `kaynak_modeller` listeleri birleşir; hiçbir kalem içerik
     kaybı yaşamaz (en zengin detay tutulur).
     """
-    # 1. Deterministik Özet/Roll-Up Elenmesi (Sayısal İmza Kapsama Garantisi)
+    # 1. Deterministik Özet/Roll-Up ve Jenerik/Şablon Tekrar Elenmesi
     riskler = rollup_ele(riskler)
+    riskler = jenerik_ve_tekrarlayan_ele(riskler)
 
     kalanlar: List[dict] = []
     for risk in riskler:

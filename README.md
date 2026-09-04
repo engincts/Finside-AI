@@ -24,7 +24,7 @@ Ayrıntı: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · Kurumsal Sunum: *
 
 Tek-model motorunun yanında, çok sayıda BDR'yi **recall-odaklı** işleyen 10 fazlı
 LangGraph pipeline: segmentasyon → triyaj → ensemble map (çoklu model) → grounding
-(rapidfuzz + sayısal imza) → uzlaştırma → critic (eksik tarama, döngülü) → sentez → QA → maliyet.
+(rapidfuzz + sayısal imza) → uzlaştırma → critic (eksik tarama, döngülü) → sanitizer (filtre ajanı) → sentez → QA → maliyet.
 
 ```bash
 docker compose up -d                      # pipeline checkpoint DB (Postgres)

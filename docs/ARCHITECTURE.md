@@ -14,9 +14,10 @@ flowchart TD
     D --> E["🔍 4. Grounding (Çok Katmanlı Doğrulama)"]
     E --> F["🤝 5. Uzlaştırma (Reconciliation & Dedupe)"]
     F --> G["🕵️ 6. Critic (Eleştirmen Ajan Döngüsü)"]
-    G --> H["🧩 7. Sentez (Synthesis & Rapor Birleştirme)"]
-    H --> I["🛡️ 8. QA Kontrolü (Quality Assurance)"]
-    I --> J["💾 9. Nihai Rapor (final_report.md / .json)"]
+    G --> H["🧹 6.5. Sanitizer (Temizlik Ajanı & Süzgeç)"]
+    H --> I["🧩 7. Sentez (Synthesis & Rapor Birleştirme)"]
+    I --> J["🛡️ 8. QA Kontrolü (Quality Assurance)"]
+    J --> K["💾 9. Nihai Rapor (final_report.md / .json)"]
 ```
 
 ---
@@ -47,6 +48,12 @@ flowchart TD
   2. Critic modeline ham BDR metni, taslak ve ipuçları verilerek eksik taraması yaptırılır.
   3. Critic'in bulduğu yeni maddeler `kaynak_modeller: ["critic"]` etiketiyle rapora eklenir.
   4. Yeni risk bulunduğu sürece `max_critic_turu` (varsayılan: 2 tur) sınırına kadar uzlaştırma döngüsü devam eder.
+
+### 🧹 6.5. Sanitizer (Temizlik Ajanı & Regex Süzgeci)
+* **Amaç:** Jenerik etki cümlelerini ("Borç ödeme kapasitesi üzerindeki olası etki") ve risk mekanizması barındırmayan soyut/yalın bilanço kalemlerini ("Kıdem Tazminatı Yükümlülüğü") ayıklayan çift aşamalı (Regex + Hızlı LLM) filtre katmanıdır.
+* **Nasıl Çalışır?**
+  1. **Python Regex Süzgeci (`jenerik_ve_tekrarlayan_ele`):** Somut finansal büyüklük (% oran, TL tutar, ipotek, rehin vb.) taşımayan yüzeysel jenerik riskleri aynı kategori altındaki spesifik dipnot maddelerinin bünyesine yedirerek tekleştirir.
+  2. **LLM Sanitizer Agent (`riskleri_temizle`):** Hızlı bir model (örn. `faz6.5-sanitizer`) aracılığıyla kalan jenerik etki cümlelerini somut finansal analizlerle günceller veya geçersiz maddeleri eler.
 
 ### 🧩 7. Sentez (Synthesis)
 * **Amaç:** Tüm doğrulanmış riskler, finansal rasyolar ve 3-4 paragraflık kıdemli analist gerekçesi tek bir **Nihai Kredi Komitesi Raporu** halinde birleştirilir.
@@ -94,8 +101,19 @@ OpenAI Strict Mode ve Gemini API uyumluluğu için tipleştirilmiş özel nesned
 
 ---
 
-## 🤖 5. LLM Sağlayıcıları ve %100 Uyumluluk Motoru
+## 🤖 5. LLM Sağlayıcıları, Limitler ve %100 Uyumluluk Motoru
 
+Sistem, `config.py` içerisindeki `Config.PROVIDER_INPUT_LIMITS` haritasına göre sağlayıcı bazında maksimum girdi karakter sınırı uygular:
+
+| Sağlayıcı (`provider`) | Efektif Girdi Sınırı (`PROVIDER_INPUT_LIMITS`) | Yaklaşık Context Window |
+| :--- | :---: | :---: |
+| **Gemini** | **3,800,000 Karakter** | 1,000,000 – 2,000,000 Token (~1M - 2M) |
+| **Anthropic** | **760,000 Karakter** | 200,000 Token (~200K) |
+| **OpenAI** | **480,000 Karakter** | 128,000 – 200,000 Token (~128K - 200K) |
+| **HuggingFace** | **250,000 Karakter** | 70,000 – 128,000 Token |
+| **Mock (Simülasyon)**| **10,000,000 Karakter** | Sınırsız |
+
+### Sağlayıcı Bazlı Uyumluluk Motorları:
 1. **OpenAI (GPT-4o, o1, o3-mini):**
    - **Strict Structured Outputs:** `additionalProperties: false` kuralına %100 uyumlu tipleştirilmiş Pydantic şemaları kullanılır.
 2. **Google Gemini (Gemini 3.6 Flash, 3.1 Pro):**
@@ -105,7 +123,32 @@ OpenAI Strict Mode ve Gemini API uyumluluğu için tipleştirilmiş özel nesned
 
 ---
 
-## 🏛️ 6. Bankacılık Standartlarında 5 Seviyeli Karar Sınıflandırması
+## 🎛️ 6. Dinamik Pipeline Yapılandırması ve Varsayılan Modeller
+
+### Pipeline Varsayılanları (`config.json`):
+`config.json` dosyasındaki `pipeline` bloğu, sistemin varsayılan rol atamalarını belirler. POC/Ekonomi modunda varsayılan olarak `gpt-oss-120b` tanımlıdır. Üretim veya benchmark modunda `gemini-3.6-flash`, `gpt-4o`, `claude-sonnet-4-5` gibi modeller tanımlanabilir.
+
+### UI Üzerinden Dinamik Rol Özelleştirme (`ui/tabs.py`):
+Pipeline sabit bir yapıya mahkûm değildir. Kullanıcı arayüzündeki **"🎛️ Pipeline Ajan Rollerini Özelleştir"** expander'ı üzerinden aşağıdaki ajan rolleri oturum bazlı olarak dinamik olarak değiştirilebilir:
+- **🤝 Uzlaştırma (Reconciler) Modeli:** `Config.update_pipeline_config(reconciler=...)`
+- **🕵️ Eleştirmen (Critic) Modeli:** `Config.update_pipeline_config(critic=...)`
+- **🧩 Sentez (Synthesis) Modeli:** `Config.update_pipeline_config(synthesis=...)`
+
+---
+
+## 🟢 7. Model Değerlendirme & Uygunluk Rozet Motoru (`Config.model_bdr_degerlendirmesi`)
+
+Sistem, yüklenen BDR dosyasının karakter/token büyüklüğüne göre seçilen modelleri analiz eder ve arayüzde (`sidebar.py` ve `tabs.py`) dinamik rozetler üretir:
+
+- **🟢 ⚡ Single Pass (İdeal & Hızlı):** BDR metni modelin Context Window sınırına sığıyor; parçalama yapmadan tek geçişte işlenir.
+- **🟡 🧩 Map-Reduce (~N Parça):** BDR metni model sınırını aşıyor; N parçaya bölünerek işlenecektir.
+- **🔴 🐢 Yüksek Parçalama (>4 Parça):** Metin çok büyük, yüksek parçalama süreyi uzatabilir.
+- **⚠️ Rozet:** Modelin Max Output Tokens tavanı düşük (<8,000 token) veya sağlayıcı uyarısı mevcut.
+- **🔑 ❌ API Key Eksik / Kullanılamaz:** `.env` dosyasında API anahtarı eksik veya model deaktif durumda.
+
+---
+
+## 🏛️ 8. Bankacılık Standartlarında 5 Seviyeli Karar Sınıflandırması
 
 | Seviye | Karar Eğilimi | Kredi Riski Şartı | Banka Tahsis Aksiyonu |
 | :---: | :--- | :--- | :--- |
@@ -114,4 +157,5 @@ OpenAI Strict Mode ve Gemini API uyumluluğu için tipleştirilmiş özel nesned
 | 🟠 **3** | **Şartlı Olumlu (Ek Teminat / Limit Kısıtlı)** | Bağlı ortaklık TRİ veya kefalet yükü yüksek. | Kredi verilir; gayrimenkul ipoteği veya limit kısıtlaması koşulur. |
 | 🔵 **4** | **Askıda (Ek Denetim / Hukuki Görüş)** | Denetçi KAM veya dava karşılıklarında belirsizlik var. | Karar dondurulur; bağımsız denetçi açıklaması veya hukuki görüş istenir. |
 | 🔴 **5** | **Olumsuz (Yüksek Risk / Red)** | Faaliyet sürekliliği belirsizliği veya ağır zafiyet var. | Kredi talebi reddedilir; risklerin tasfiyesi başlatılır. |
+
 

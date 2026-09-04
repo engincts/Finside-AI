@@ -12,6 +12,7 @@
     "triage_model": "gpt-oss-120b",
     "reconciler_model": "gpt-oss-120b",
     "critic_model": "gpt-oss-120b",
+    "sanitizer_model": "gpt-oss-120b",
     "synthesis_model": "gpt-oss-120b",
     "segmenter_fallback_model": "gpt-oss-120b",
     "segmenter_guven_esigi": 0.6,

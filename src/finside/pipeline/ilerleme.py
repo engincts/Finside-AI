@@ -16,7 +16,7 @@ FAZ_ETIKETLERI = {
     "map_worker": "3 · Ensemble Map çıkarımı",
     "map_topla": "3 · Map birleştirme",
     "grup_isle": "4-6 · Grounding + Uzlaştırma + Critic",
-    "sentezle": "7 · Sentez",
+    "sentezle": "6.5-7 · Sanitizer + Sentez",
     "qa_kontrol": "8 · Tutarlılık QA",
     "maliyet_ozetle": "10 · Maliyet özeti",
 }
@@ -28,10 +28,11 @@ def _liste(guncelleme: dict, anahtar: str) -> list:
 
 def model_rolleri_satiri(map_modelleri: List[str]) -> str:
     pc = Config.get_pipeline_config()
+    san_m = pc.get("sanitizer_model", pc.get("critic_model", "—"))
     return (
         f"map (risk çıkarımı): {', '.join(map_modelleri) or '—'}  ·  "
         f"triyaj: {pc['triage_model']}  ·  uzlaştırma: {pc['reconciler_model']}  ·  "
-        f"critic: {pc['critic_model']}  ·  sentez: {pc['synthesis_model']}"
+        f"critic: {pc['critic_model']}  ·  sanitizer: {san_m}  ·  sentez: {pc['synthesis_model']}"
     )
 
 

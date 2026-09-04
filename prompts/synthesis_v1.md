@@ -14,6 +14,9 @@ Görevin: bu risklere dayanarak Kredi Komitesi Raporu'nun ÜST DÜZEY alanların
 - `analist_gerekce_metni`: yüzeysel 1-2 cümle değil, şirketin likidite rasyoları, kur duyarlılığı, teminat yapısı ve Kredi Komitesi risk marjını detaylıca gerekçelendiren 3-4 paragraflık zengin ve derin analist değerlendirmesi.
 - `komite_tavsiyesi_ve_sartlar`: riski kısıtlayan somut ve ölçülebilir covenant/şartlar.
 
+ŞABLON CÜMLE VE SÖZDE RİSK ELEME İLKESİ:
+- `etki_degerlendirmesi` alanlarında "Borç ödeme kapasitesi üzerindeki olası etki." gibi jenerik şablon cümleler geçen ve somut finansal tehdit taşımayan kalemleri (örn. sadece bakiye bildiren 'Nakit ve Nakit Benzerleri') ele veya özgün detaylı dipnot riskiyle birleştir.
+
 `firma_adi`, `rapor_donemi`, `denetim_firmasi`, `denetci_gorusu` alanlarını künyeden doldur.
 `tespit_edilen_riskler` alanını BOŞ LİSTE (`[]`) olarak bırak — risk listesi ayrıca
 sistem tarafından eklenecek, senin tekrar yazman gerekmiyor (çıktıyı kısa tutar).
