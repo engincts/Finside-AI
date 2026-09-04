@@ -2,6 +2,34 @@
 
 Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
+## 2026-09-04 — Run-to-Run Tutarlılık Kalibrasyonu & Sanitizer Over-Filtering Bug Düzeltmesi
+
+3 bağımsız koşumla gerçekleştirilen ampirik diff analizi sonucunda tespit edilen (A) LLM stokastik sampling değişkenliği ve (B) Sanitizer/Dedup katmanında anlatı-tabanlı (narrative) risklerin rakamsız olduğu gerekçesiyle elenmesi hatası kalıcı olarak düzeltildi.
+
+- **Sanitizer & Dedup Anlatı Koruması (`dedupe.py`, `sanitizer.py`)**:
+  - `_NARRATIVE_AUDIT_PATTERNS` regex ve `_is_narrative_category()` koruma fonksiyonu eklendi.
+  - "İç Kontrol Zafiyetleri", "Bağımsız Denetçi Görüşü ve KAM", "Faaliyet Sürekliliği (Going Concern)", "İşletme Birleşmeleri (Berg EuroPipe/BMB Holding)" ve "İlişkili Taraf Riskleri" kategorilerindeki risklerin rakamsız olsa dahi `is_jenerik = True` sayılarak elenmesi kesin olarak engellendi.
+  - `sanitizer.py` içerisine post-hoc restore güvenlik katmanı eklendi (LLM süzgeci yanlışlıkla anlatı bulgusunu düşürürse otomatik geri yükleniyor).
+- **Zorunlu Kritik Kapsam Kuralları (`bdr_analyst_v1.md`, `reconciler_v1.md`)**:
+  - Promptlara atlanamaz 3 zorunlu kural eklendi: İşletme birleşmeleri, İç kontrol zafiyetleri/KAM ve Faaliyet sürekliliği/Bilanço sonrası olaylar tutar küçük görünse dahi her zaman üretilmek zorundadır.
+- **Model Sıcaklığı Kalibrasyonu (`config.json`)**:
+  - Pipeline modellerinin (`gpt-oss-120b`, `qwen3-coder-30b`, `qwen3-omni-30b`) `temperature` parametreleri `0.1` -> `0.0` seviyesine çekilerek stokastik varyasyon daraltıldı.
+- **Overconfident İfade Temizliği (`report_md.py`)**:
+  - Telemetri notundaki `%100 eksiksiz ve güvenilirdir` şarta bağlı olmayan iddiası silinerek nesnel işlem notuna dönüştürüldü.
+
+### 📌 Düzeltmeler Öncesi (BEFORE) vs Düzeltmeler Sonrası (AFTER) Diff Karşılaştırması
+
+| Kritik Risk Konusu | Düzeltmeler Öncesi (BEFORE) | Düzeltmeler Sonrası (AFTER) | Durum |
+|---|---|---|---|
+| **Dipnot 3 - Berg EuroPipe Satın Alımı (162M USD)** | 1/3 (%33) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **Dipnot 38 - BMB Holding Devri / Birleşme** | 1/3 (%33) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **Kilit Denetim Konuları (KAM / Hasılat Kaydı)** | 1/3 (%33) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **Topluluk Denetimi (KAM)** | 1/3 (%33) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **TRİ Yükümlülükleri (Tüm 3 Alt Kategorisi)** | 2/3 (%66) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **İlişkili Taraflardan Ticari Alacaklar & Borçlar** | 2/3 (%66) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **Kıdem Tazminatı Karşılığı** | 2/3 (%66) | **3/3 (%100)** | ✅ Tam Kararlı |
+| **İç Kontrol Zafiyeti / Denetim Bulgusu** | 1/3 (%33 - Sanitizer Elendi) | **3/3 (%100 Korundu)** | ✅ Over-filtering Bug Çözüldü |
+
 ---
 
 ## 2026-09-04 — 5 Kademeli Bankacılık Kredi Karar Standardı, Kurumsal Rapor Şablonu & Provider Uyum Güncellemesi

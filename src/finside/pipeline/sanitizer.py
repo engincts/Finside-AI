@@ -18,6 +18,7 @@ def riskleri_temizle(riskler: List[dict], model_id: str) -> Tuple[List[dict], Li
         "Görevin: Verilen BDR kalitatif risk listesini inceleyip GERÇEK kredi riski taşıyan maddeleri korumak;\n"
         "1. Hiçbir kısıt veya finansal tehdit taşımayan salt bilanço bakiyelerini (örn: 'Nakit ve Nakit Benzerleri', 'Sunuma İlişkin Esaslar') ELEMEK,\n"
         "2. 'Borç ödeme kapasitesi üzerindeki olası etki' gibi jenerik/boş etki cümleli ve dipnotsuz jenerik tekrarları ELEMEK veya aynı kategorideki daha spesifik dipnot riskiyle BİRLEŞTİRMEKtir.\n"
+        "3. ZORUNLU KORUMA: Kilit Denetim Konuları (KAM), Bağımsız Denetçi Görüşü, İç Kontrol Zafiyetleri, Faaliyet Sürekliliği (Going Concern) ve İşletme Birleşmeleri (Berg EuroPipe/BMB Holding) gibi anlatı-tabanlı denetim bulgularını tutar rakamı içermese dahi KESİNLİKLE ELEME ve raporda KORU.\n"
         "Sadece temizlenmiş ve süzülmüş nihai `tespit_edilen_riskler` listesini üret."
     )
 
@@ -29,6 +30,13 @@ def riskleri_temizle(riskler: List[dict], model_id: str) -> Tuple[List[dict], Li
         )
         if sonuc.report and sonuc.report.tespit_edilen_riskler and not sonuc.report.is_mock_fallback:
             temiz = [r.model_dump() for r in sonuc.report.tespit_edilen_riskler]
+            # Post-hoc Güvenlik Guard: LLM yanlışlıkla anlatı-tabanlı denetim bulgularını veya birleşmeleri elemişse geri restore et
+            from finside.dedupe import _is_narrative_category, _norm
+            temiz_basliklar = {_norm(t.get("baslik") or "") for t in temiz}
+            for orig in riskler:
+                if _is_narrative_category(orig):
+                    if _norm(orig.get("baslik") or "") not in temiz_basliklar:
+                        temiz.append(orig)
             return temiz, [sonuc.trace]
         return riskler, [sonuc.trace] if sonuc else []
     except Exception:

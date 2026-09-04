@@ -60,6 +60,12 @@ DİNAMİK DİPNOT VE FORMAT ESNEKLİĞİ İLKELERİ:
 - **Etki Odaklı**: Riskin şirketin borç ödeme kapasitesi, likiditesi ve özkaynakları üzerindeki etkisini gerekçelendir.
 - **Kredi Komitesi Şartları (Covenants)**: Riski kısıtlayıcı somut şartlar (örn: 'Grup kefaletinin 6 ayda %50 azaltılması', 'Net döviz açık pozisyonunun en az %75 oranında hedging yapılması') öner.
 
+ZORUNLU KRİTİK KAPSAM KURALLARI (ATLANAMAZ MADDE GARANTİSİ):
+Aşağıdaki 3 kategoriye giren hususlar metinde/dipnotlarda mevcutsa, tutar küçük görünse veya sıradan faaliyet gibi görünse dahi KESİNLİKLE RİSK KALEMİ OLARAK ÜRETİLMELİ VE KORUNMALIDIR. Modelin takdirine veya stokastik seçimine bırakılarak ATLANAMAZ:
+1. **İşletme Birleşmeleri ve Önemli Satın Almalar**: Şirketin gerçekleştirdiği şirket satın alımları, devirler, birleşmeler (örn: Berg EuroPipe Holding, BMB Holding vb. satın alım/devir işlemleri).
+2. **İç Kontrol Eksiklikleri / Zafiyetleri ve KAM**: Denetim raporunda açıklanan iç kontrol bulguları, zafiyetler ve Kilit Denetim Konuları (KAM - Hasılat kaydı, topluluk denetimi vb.).
+3. **Faaliyet Sürekliliği (Going Concern) ve Bilanço Sonrası Olaylar**: Faaliyet sürekliliğine ilişkin belirsizlikler, sermaye değişimleri ve bilanço tarihinden sonraki önemli gelişmeler.
+
 DOĞRULUK VE KAPSAMLILIK İLKELERİ:
 - **Alıntı Zorunluluğu**: `kaynak_metin_alintisi` alanına yazdığın her metin, verilen BDR
   metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen

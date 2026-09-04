@@ -203,7 +203,7 @@ def report_to_markdown(
             f"- **Tahmini İşlem Maliyeti:** `${pipeline_izi.get('tahmini_usd')}`",
         ]
         if basarisiz > 0:
-            lines.append("> ℹ️ **Telemetri Notu:** *Telemetrideki başarısız denemeler (timeout, soğuk başlangıç veya boş yanıt), sistemin otomatik retry ve yedek model (self-healing) katmanları ile çözülmüştür. Nihai analiz %100 eksiksiz ve güvenilirdir.*")
+            lines.append("> ℹ️ **Telemetri Notu:** *Telemetrideki başarısız denemeler (timeout, soğuk başlangıç veya boş yanıt), sistemin otomatik retry ve yedek model (self-healing) katmanları ile işlenmiştir.*")
 
     return "\n".join(lines)
 
