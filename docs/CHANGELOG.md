@@ -4,6 +4,29 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-04 — 5 Kademeli Bankacılık Kredi Karar Standardı, Kurumsal Rapor Şablonu & Provider Uyum Güncellemesi
+
+Borusan BDR ve kurumsal kredi tahsis raporlama gereksinimleri doğrultusunda sistem geneli 5 kademeli kredi karar skalası, kurumsal banka rapor tasarımı (`report_md.py`), Pydantic şema dayanıklılığı ve cloud model limitleri güncellendi.
+
+- **5 Kademeli Bankacılık Karar Skalası (`schemas.KomiteKararEgilimi`)**:
+  - Karar eğilimi enum'ı bankacılık standartlarına genişletildi: `OLUMLU` (Koşulsuz onay), `SARTLI_OLUMLU_COVENANT` (Finansal Covenant / Taahhüt Şartlı), `SARTLI_OLUMLU_TEMINAT` (Ek Teminat / Limit Kısıtlaması Bağlı), `OLUMSUZ` (Yüksek Risk / Faaliyet Sürekliliği Riski), `KARARSIZ` (Ek Denetim İncelemesi). Eski `SARTLI_OLUMLU` geriye dönük uyumluluk için korundu.
+- **Şema & Pydantic Güvenilirliği (`schemas.py`)**:
+  - `FinansalRasyoOzeti` Pydantic sınıfı oluşturularak OpenAI Strict Mode ve Gemini REST payload `Dict[str, Any]` ek parametre reddi hataları önlendi.
+  - Açık kaynak modellerin (Qwen, Llama vb.) eksik/boş bıraktığı JSON alanları için `fallback_kaynak_alintisi` ve `normalize_risk_derecesi` pre-validator'ları eklendi.
+- **Oturum İçi Config Önbelleği & UI İyileştirmeleri (`config.py`, `tabs.py`, `sidebar.py`)**:
+  - Streamlit UI'da `AttributeError: type object 'Config' has no attribute '_config_data'` hatasını çözmek için `_config_data` in-memory önbelleği ve `Config.update_pipeline_config()` metodu eklendi.
+  - Multi-Agent Pipeline sekmesinde Reconciler, Critic ve Synthesis model seçim kutularının altına ne iş yaptıklarını açıklayan `st.caption` açıklamaları ve `help` bilgi ipuçları eklendi.
+- **Kurumsal Banka Kredi Komitesi Rapor Formatı (`report_md.py`)**:
+  - Rapor çıktısı ham AI dökümünden çıkarılıp üst düzey banka raporu formatına dönüştürüldü: `> [!IMPORTANT]` karar özet kartı, `Kredi Tahsis & Teklif Çerçevesi` tablosu, `Risk Dağılım Matrisi & Finansal Özet Tablosu`, ve kategorilerine göre gruplanmış risk klasörleri (`📂 Teminat ve TRİ Yükleri`, `📂 Kur ve Faiz Riskleri` vb.).
+  - `Analiz Süresi: None saniye` biçimlendirme hatası `report_md.py` içinde `sure_str` kontrolü ile `Tamamlandı` veya hassas saniye formatına çevrildi.
+- **Deduplikasyon regex Başlık Temizliği (`reconciler.py`)**:
+  - `_DIPNOT_PREFIX_RE` regex entegre edilerek `Dipnot 7 - Kısa Vadeli Borçlanmalar` ile `Kısa Vadeli Borçlanmalar` gibi aynı konulu tekrarlayan başlıkların tekil kaleme uzlaştırılması sağlandı.
+- **Cloud Model Limit Güncellemeleri (`config.py`, `config.json`)**:
+  - `PROVIDER_INPUT_LIMITS` güncellendi: Gemini `3,800,000` karakter (~1M Token), Anthropic `760,000` karakter, OpenAI `480,000` karakter.
+  - Gemini modellerinin `max_tokens` çıktı tavanı `16,384` seviyesinden `65,536` (~64K output tokens) seviyesine yükseltildi.
+
+Doğrulama: `run_poc.py --mock` ve Python derleme testleri yürütüldü (`exit code 0`).
+
 ## 2026-09-04 — Model seçim ekranı: uygunluk sınıflandırması + bilinen sorunlar
 
 Benchmark koşumunda `claude-sonnet-4-5` (32K çıktı tavanı aşıldı) ve `hf-deepseek-v3`
