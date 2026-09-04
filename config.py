@@ -46,11 +46,11 @@ class Config:
     MAX_CHUNK_WORKERS: int = 4
 
     PROVIDER_INPUT_LIMITS: Dict[str, int] = {
-        "huggingface": 90_000,
-        "openai": 200_000,
-        "anthropic": 200_000,
-        "gemini": 200_000,
-        "mock": 5_000_000,
+        "huggingface": 250_000,
+        "openai": 480_000,
+        "anthropic": 760_000,
+        "gemini": 3_800_000,
+        "mock": 10_000_000,
     }
 
     # 4. Tekleştirme & Embedding Ayarları (Deduplication)

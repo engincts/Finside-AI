@@ -15,8 +15,14 @@ from finside.pipeline.state import TraceKaydi
 RISK_DERECE_SIRA = {"Düşük": 0, "Orta": 1, "Yüksek": 2, "Kritik": 3}
 
 
+import re
+
+_DIPNOT_PREFIX_RE = re.compile(r"^dipnot\s+\d+\s*[-–:]\s*", re.IGNORECASE)
+
+
 def _baslik(risk: dict) -> str:
-    return (risk.get("baslik") or "").strip().lower()
+    raw = (risk.get("baslik") or "").strip().lower()
+    return _DIPNOT_PREFIX_RE.sub("", raw).strip()
 
 
 def mekanik_birlestir(riskler: List[dict]) -> Tuple[List[dict], List[dict]]:
