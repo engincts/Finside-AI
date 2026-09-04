@@ -18,13 +18,13 @@ Kredi Komitesi Risk Raporu üretir → sonuçlar `outputs/` altına ve karşıla
 - **Dayanıklılık**: mock fallback, otomatik model fallback, streaming, JSON onarımı,
   esnek enum normalizasyonu.
 
-Ayrıntı: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · Değişiklik geçmişi: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
+Ayrıntı: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · Kurumsal Sunum: **[docs/EXECUTIVE_PRESENTATION_GUIDE.md](docs/EXECUTIVE_PRESENTATION_GUIDE.md)** · Değişiklik geçmişi: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
 
 ### 🔗 Multi-Agent Pipeline (LangGraph)
 
 Tek-model motorunun yanında, çok sayıda BDR'yi **recall-odaklı** işleyen 10 fazlı
 LangGraph pipeline: segmentasyon → triyaj → ensemble map (çoklu model) → grounding
-(rapidfuzz) → uzlaştırma → critic (eksik tarama, döngülü) → sentez → QA → maliyet.
+(rapidfuzz + sayısal imza) → uzlaştırma → critic (eksik tarama, döngülü) → sentez → QA → maliyet.
 
 ```bash
 docker compose up -d                      # pipeline checkpoint DB (Postgres)
@@ -32,22 +32,22 @@ python run_poc.py --batch data/bdr_samples --map-models gemini-3.6-flash,claude-
 ```
 
 Streamlit'te **"🔗 Multi-Agent Pipeline"** sekmesinden tek BDR için canlı faz takibiyle
-çalıştırılabilir. Tasarım: **[docs/PIPELINE_DESIGN.md](docs/PIPELINE_DESIGN.md)**
+çalıştırılabilir. Tasarım ve Teknik Detaylar: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ---
 
-## 🚀 Max Tokens & Muhakeme Kapasitesi
+## 🚀 Max Tokens & Cloud Context Window Kapasitesi
 
 Modellerin çıktı uzunluğu ve derin muhakeme (reasoning effort) tavanı `config.json`
 üzerinden model bazında ayarlanır:
 
-- **Google Gemini (3.6 Flash / 3.1 Pro)**: `16,384 max_tokens` + `high reasoning_effort`
-- **OpenAI (GPT-4o, GPT-4o-mini, o3-mini)**: `8,192 – 16,384 max_tokens` + `high reasoning_effort`
-- **Anthropic (Claude Sonnet 4.5)**: `32,000 max_tokens` (forced tool-use + streaming)
-- **Açık Ağırlık Modeller (GPT-OSS 120B, Qwen2.5 72B, Llama 3.3 70B, Qwen3 32B, Gemma 3 27B, DeepSeek V3)**: `8,192 max_tokens`, HuggingFace serverless router üzerinden
+- **Google Gemini (3.6 Flash / 3.1 Pro)**: `65,536 max_tokens` (64K çıktı tavanı) + `1M-2M Token Context Window`
+- **OpenAI (GPT-4o, GPT-4o-mini, o3-mini)**: `16,384 – 65,536 max_tokens` + `128K Context Window`
+- **Anthropic (Claude Sonnet 4.5)**: `64,000 max_tokens` + `200K Context Window`
+- **Açık Ağırlık Modeller (GPT-OSS 120B, Qwen2.5 72B, Llama 3.3 70B)**: `16,384 max_tokens`, HuggingFace serverless router üzerinden
 
-Girdi tarafında chunking eşiği sağlayıcıya göre değişir (`analyzer.PROVIDER_INPUT_LIMITS`:
-HF 90K, bulut 200K karakter); `config.json` içinde `max_input_chars` ile ezilebilir.
+Girdi tarafında chunking eşiği sağlayıcıya göre değişir (`Config.PROVIDER_INPUT_LIMITS`:
+Gemini 3.8M karakter / ~1M token, Anthropic 760K, OpenAI 480K, HF 250K karakter); `config.json` içinde `max_input_chars` ile ezilebilir.
 
 ---
 
@@ -95,7 +95,10 @@ Finside-AI/
 ├── config.json                # Tüm Açık & Kapalı Kaynak LLM Yapılandırmaları
 ├── config.py                  # Merkezi Konfigürasyon ve Eşik Değerleri (Single Source of Truth)
 ├── requirements.txt           # Python Bağımlılıkları Listesi
-├── docs/                      # Mimari ve Tasarım Dokümanları
+├── docs/                      # Mimari, Kurumsal Sunum ve Değişiklik Dokümanları
+│   ├── ARCHITECTURE.md        # Master Teknik Mimari & Pipeline El Kitabı
+│   ├── EXECUTIVE_PRESENTATION_GUIDE.md # Kurumsal Sunum & Değer Önerisi Rehberi
+│   └── CHANGELOG.md           # Proje Değişiklik Günlüğü (Sistem Hafızası)
 ├── data/bdr_samples/          # Örnek BDR Metin Verileri
 ├── prompts/                   # Markdown Prompt Şablonları
 └── src/finside/
