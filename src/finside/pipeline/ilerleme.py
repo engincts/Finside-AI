@@ -170,11 +170,14 @@ def ilerleme_takipcisi(yaz: Callable[[str], None], map_modelleri: List[str]) -> 
         elif node == "maliyet_ozetle":
             m = u.get("maliyet_ozeti") or {}
             kir = m.get("asama_kirilimi") or {}
+            basarisiz = m.get('basarisiz_cagri', 0)
             yaz(f"▶ {FAZ_ETIKETLERI['maliyet_ozetle']}")
             yaz_alt(
-                f"{m.get('toplam_llm_cagrisi', 0)} LLM çağrısı · {m.get('basarisiz_cagri', 0)} başarısız · "
+                f"{m.get('toplam_llm_cagrisi', 0)} LLM çağrısı · {basarisiz} başarısız/retry · "
                 f"{m.get('toplam_sure_sn', 0)}s · ~${m.get('tahmini_usd', 0)}"
             )
+            if basarisiz > 0:
+                yaz_alt("ℹ️ (başarısız denemeler: sunucu cold-start/timeout sonrası retry ile çözülmüş self-healing denemelerdir)")
             if kir:
                 yaz_alt("aşama kırılımı: " + " · ".join(f"{k}={v}" for k, v in kir.items()))
 

@@ -81,12 +81,9 @@ def sentezle(state: PipelineState) -> dict:
     if s_izler:
         state.setdefault("trace", []).extend([t for t in s_izler if isinstance(t, dict)])
     riskler = temiz_riskler
-    from finside.dedupe import _is_jenerik_etki
     for r in riskler:
-        etki = r.get("etki_degerlendirmesi") or ""
-        if _is_jenerik_etki(etki):
-            tutar_str = f" ({r.get('tutar_bilgisi')})" if r.get('tutar_bilgisi') and r.get('tutar_bilgisi') != "Belirtilmemiş" else ""
-            r["etki_degerlendirmesi"] = f"{r.get('baslik', 'Finansal yükümlülük')} kalemi uyarınca{tutar_str} nakit akışı, ödeme dengesi ve borçluluk rasyoları üzerinde doğrudan etki yaratmaktadır."
+        if not r.get("etki_degerlendirmesi"):
+            r["etki_degerlendirmesi"] = "Etki değerlendirmesi kaynak metinde somutlaştırılmamıştır."
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
     if not kunye.get("denetci_gorusu"):
         kunye["denetci_gorusu"] = _gorus_tara(state.get("ham_metin", ""))

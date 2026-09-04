@@ -121,8 +121,8 @@ def _local_text_similarity(t1: str, t2: str) -> float:
 
 
 _JENERIK_PATTERN = re.compile(
-    r"(borç\s+ödeme|likidite|finansal\s+durum|kapasitesi?|faaliyet|performans)"
-    r".*(olası|etki|yansı|sonuç|değerlendir|baskı)",
+    r"(borç\s+ödeme|likidite|finansal\s+durum|kapasitesi?|faaliyet|performans|nakit\s+akışı|ödeme\s+dengesi|borçluluk\s+rasyoları)"
+    r".*(olası|etki|yansı|sonuç|değerlendir|baskı|doğrudan\s+etki)",
     re.IGNORECASE | re.DOTALL
 )
 
@@ -133,6 +133,8 @@ def _is_jenerik_etki(etki: str) -> bool:
     etki_clean = etki.strip().lower()
     if len(etki_clean) < 20:
         return True
+    if "nakit akışı, ödeme dengesi ve borçluluk rasyoları" in etki_clean:
+        return True
     has_specifics = bool(re.search(r"\d|yüzde|%|ipotek|rehin|kefalet|dava|hedg|kambiyo|vergi|karşılık|bulaşma|türev", etki_clean))
     if _JENERIK_PATTERN.search(etki_clean) and not has_specifics:
         return True
@@ -140,9 +142,9 @@ def _is_jenerik_etki(etki: str) -> bool:
 
 
 def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
-    """Aynı kategoride daha spesifik (dipnot referanslı veya özgün etki açıklamalı) kalem varken,
-    jenerik/sözde (örn: 'Kur Riski', 'Likidite Riski', 'Kıdem Tazminatı') ve şablon etki cümleli
-    tekrarlayan kalemleri eler ve kaynak modellerini spesifik kaleme aktarır.
+    """Tüm gruplardan gelen kalemler arasında jenerik/sözde (örn: 'Kur Riski', 'Likidite Riski') ve
+    şablon etki cümleli tekrarlayan kalemleri eler ve kaynak modellerini spesifik kaleme aktarır.
+    Kategori kısıtlaması olmaksızın küresel (global) çalışır.
     """
     if len(riskler) < 2:
         return list(riskler)
@@ -151,7 +153,6 @@ def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
     for i, risk in enumerate(riskler):
         if i in elenen_indeksler:
             continue
-        kat = risk.get("risk_kategorisi")
         baslik = _norm(risk.get("baslik") or "")
         etki = risk.get("etki_degerlendirmesi") or ""
         is_jenerik = _is_jenerik_etki(etki) or not risk.get("tutar_bilgisi") or "Tutarsız" in str(risk.get("tutar_bilgisi")) or "Belirtilmemiş" in str(risk.get("tutar_bilgisi"))
@@ -159,31 +160,30 @@ def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
         for j, diger in enumerate(riskler):
             if i == j or j in elenen_indeksler:
                 continue
-            diger_kat = diger.get("risk_kategorisi")
-            if kat and diger_kat == kat:
-                diger_baslik = _norm(diger.get("baslik") or "")
-                diger_etki = diger.get("etki_degerlendirmesi") or ""
-                diger_jenerik = _is_jenerik_etki(diger_etki)
-                diger_spesifik = not diger_jenerik or bool(diger.get("dipnot_referansi"))
+            diger_baslik = _norm(diger.get("baslik") or "")
+            diger_etki = diger.get("etki_degerlendirmesi") or ""
+            diger_jenerik = _is_jenerik_etki(diger_etki)
+            diger_spesifik = not diger_jenerik or bool(diger.get("dipnot_referansi"))
 
-                is_overlap = (baslik in diger_baslik or diger_baslik in baslik)
-                is_generic_vs_specific = is_jenerik and diger_spesifik and (is_overlap or not risk.get("dipnot_referansi"))
+            is_overlap = (baslik in diger_baslik or diger_baslik in baslik)
+            is_generic_vs_specific = is_jenerik and diger_spesifik and (is_overlap or not risk.get("dipnot_referansi"))
 
-                if is_generic_vs_specific:
-                    diger["kaynak_modeller"] = sorted(
-                        set(diger.get("kaynak_modeller", [])) | set(risk.get("kaynak_modeller", []))
-                    )
-                    elenen_indeksler.add(i)
-                    break
+            if is_generic_vs_specific:
+                diger["kaynak_modeller"] = sorted(
+                    set(diger.get("kaynak_modeller", [])) | set(risk.get("kaynak_modeller", []))
+                )
+                elenen_indeksler.add(i)
+                break
 
     return [r for i, r in enumerate(riskler) if i not in elenen_indeksler]
 
 
 def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List[dict]:
-    """Faz 7 global dedup: önce deterministik roll-up ve jenerik tekrar elenmesi, başlık eşleşmesi, sonra embedding / yerel anlamsal yakın-tekrar birleştirme.
+    """Faz 7 global cross-group dedup: deterministik roll-up, jenerik tekrar elenmesi,
+    küresel (kategoriler arası) sayısal eşleşme ve anlamsal yakın-tekrar birleştirme.
 
-    Birleştirilen kalemlerin `kaynak_modeller` listeleri birleşir; hiçbir kalem içerik
-    kaybı yaşamaz (en zengin detay tutulur).
+    Farklı gruplardan (chunk) gelen aynı finansal rakamı veya alıntıyı taşıyan kalemler
+    farklı kategorilere atanmış olsa bile küresel olarak birleştirilir.
     """
     # 1. Deterministik Özet/Roll-Up ve Jenerik/Şablon Tekrar Elenmesi
     riskler = rollup_ele(riskler)
@@ -214,14 +214,17 @@ def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List
             tutulan: List[dict] = []
             tutulan_vek: List[List[float]] = []
             for risk, vek in zip(kalanlar, vektorler):
-                eslesme = next(
-                    (
-                        i for i, tv in enumerate(tutulan_vek)
-                        if _cosine(vek, tv) >= Config.NEAR_DUP_THRESHOLD
-                        and tutulan[i].get("risk_kategorisi") == risk.get("risk_kategorisi")
-                    ),
-                    None,
-                )
+                sayilar = _kalem_sayilari(risk)
+                eslesme = None
+                for i, tv in enumerate(tutulan_vek):
+                    mev = tutulan[i]
+                    mev_sayilar = _kalem_sayilari(mev)
+                    sayi_eslesmesi = bool(sayilar and mev_sayilar and sayilar.intersection(mev_sayilar))
+                    sim = _cosine(vek, tv)
+                    kat_eslesmesi = (mev.get("risk_kategorisi") == risk.get("risk_kategorisi"))
+                    if sayi_eslesmesi or (sim >= Config.NEAR_DUP_THRESHOLD and kat_eslesmesi) or sim >= 0.90:
+                        eslesme = i
+                        break
                 if eslesme is None:
                     tutulan.append(risk)
                     tutulan_vek.append(vek)
@@ -229,24 +232,33 @@ def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List
                     tutulan[eslesme]["kaynak_modeller"] = sorted(
                         set(tutulan[eslesme].get("kaynak_modeller", [])) | set(risk.get("kaynak_modeller", []))
                     )
+                    if len(str(risk.get("detay") or "")) > len(str(tutulan[eslesme].get("detay") or "")):
+                        tutulan[eslesme]["detay"] = risk["detay"]
             return tutulan
 
-    # API Key Yoksa veya Embedding Fallback Durumunda: Yerel Hibrit Anlamsal Birleştirme
+    # API Key Yoksa veya Embedding Fallback Durumunda: Yerel Küresel Anlamsal Birleştirme
     tutulan_yerel: List[dict] = []
     for risk in kalanlar:
         sig = _risk_signature_dict(risk)
         kat = risk.get("risk_kategorisi")
         sayilar = _kalem_sayilari(risk)
+        alinti = _norm(risk.get("kaynak_alinti") or "")
 
         eslesme_idx = None
         for i, mev in enumerate(tutulan_yerel):
-            if kat and mev.get("risk_kategorisi") == kat:
-                mev_sayilar = _kalem_sayilari(mev)
-                sayi_eslesmesi = bool(sayilar and mev_sayilar and sayilar.intersection(mev_sayilar))
-                sim = _local_text_similarity(sig, _risk_signature_dict(mev))
-                if sim >= 0.65 or (sim >= 0.40 and sayi_eslesmesi):
-                    eslesme_idx = i
-                    break
+            mev_kat = mev.get("risk_kategorisi")
+            mev_sayilar = _kalem_sayilari(mev)
+            mev_alinti = _norm(mev.get("kaynak_alinti") or "")
+
+            sayi_eslesmesi = bool(sayilar and mev_sayilar and sayilar.intersection(mev_sayilar))
+            alinti_eslesmesi = bool(alinti and mev_alinti and (alinti in mev_alinti or mev_alinti in alinti or _local_text_similarity(alinti, mev_alinti) >= 0.70))
+            sim = _local_text_similarity(sig, _risk_signature_dict(mev))
+
+            kat_eslesmesi = (kat and mev_kat == kat)
+            # Sayı veya alıntı eşleşmesi varsa kategori fark etmeksizin dedup yap
+            if sayi_eslesmesi or alinti_eslesmesi or (kat_eslesmesi and sim >= 0.65) or sim >= 0.85:
+                eslesme_idx = i
+                break
 
         if eslesme_idx is None:
             tutulan_yerel.append(risk)

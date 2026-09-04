@@ -40,8 +40,8 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
             f"{segment_sayisi} segment işlendi ama hiç risk bulunamadı — olası pipeline hatası."
         )
 
-    # Jenerik Şablon Etki Cümlesi Tekrarı Kontrolü (Regex + Somutluk Süzgeci)
-    from finside.dedupe import _is_jenerik_etki
+    # Jenerik Şablon Etki Cümlesi Tekrarı Kontrolü (Regex + Somutluk Süzgeci + Dinamik Yapısal N-Gram)
+    from finside.dedupe import _is_jenerik_etki, _onemli_sayilar
     if riskler:
         jenerik_etki_sayisi = sum(
             1 for r in riskler
@@ -50,7 +50,45 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
         if jenerik_etki_sayisi >= 3:
             bayraklar.append(
                 f"Tespit edilen risklerin {jenerik_etki_sayisi} tanesinde jenerik/şablon etki cümlesi "
-                "(somut gerekçesi olmayan 'Borç ödeme kapasitesi üzerindeki olası etki' vb.) tespit edildi."
+                "(somut gerekçesi olmayan 'Borç ödeme kapasitesi' / 'nakit akışı, ödeme dengesi' vb.) tespit edildi."
             )
+
+        # Dinamik Yapısal Şablon Cümle Tekrarı Kontrolü (Suffix / N-gram Tekrarı)
+        etki_sonlari = [
+            (r.etki_degerlendirmesi or "").strip().lower()[-60:]
+            for r in riskler
+            if len((r.etki_degerlendirmesi or "").strip()) >= 30
+        ]
+        if etki_sonlari:
+            from collections import Counter
+            son_sayac = Counter(etki_sonlari)
+            tekrarlayan_sonlar = [son for son, cnt in son_sayac.items() if cnt >= 3]
+            if tekrarlayan_sonlar:
+                toplam_tekrarlayan = sum(son_sayac[s] for s in tekrarlayan_sonlar)
+                bayraklar.append(
+                    f"Tespit edilen risklerin {toplam_tekrarlayan} tanesinde birebir aynı bitiş kalıbına sahip "
+                    "yapısal şablon etki cümlesi bulundu. ('... " + tekrarlayan_sonlar[0][-35:] + "')"
+                )
+
+        # İç Rakam Tutarsızlığı Kontrolü (Başlık Tutarı vs Detay Tutarı)
+        def _tum_sayilar(m: str) -> set:
+            from finside.dedupe import _SAYI_RE, _YIL_ARALIGI
+            bul: set = set()
+            for e in _SAYI_RE.findall(m or ""):
+                r = e.replace(".", "").replace(",", "")
+                if len(r) >= 2 and int(r) not in _YIL_ARALIGI:
+                    bul.add(r)
+            return bul
+
+        for r in riskler:
+            baslik_sayilar = _tum_sayilar(r.baslik or "")
+            if baslik_sayilar:
+                detay_sayilar = _tum_sayilar(f"{r.detay or ''} {r.tutar_bilgisi or ''}")
+                if detay_sayilar and not baslik_sayilar.intersection(detay_sayilar):
+                    # Başlıkta sayı var ama detayda/tutar_bilgisi'nde bu sayı HİÇ geçmiyor ve başka sayılar var
+                    bayraklar.append(
+                        f"RAKAM-TUTARSIZLIĞI: '{r.baslik[:45]}' kaleminde başlıkta geçen sayı ({', '.join(sorted(baslik_sayilar))}) "
+                        f"detay metninde ({', '.join(sorted(detay_sayilar))}) doğrulanamadı veya çelişiyor."
+                    )
 
     return bayraklar
