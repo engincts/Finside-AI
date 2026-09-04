@@ -9,9 +9,26 @@ from finside.models import SidebarState
 
 def render_sidebar() -> SidebarState:
     """Kullanıcı dostu, adım adım yapılandırılmış yan kontrol panelini çizer."""
+    # Sidebar genişliğini ve okunabilirliğini artırmak için özel CSS enjeksiyonu
+    st.markdown(
+        """
+        <style>
+            [data-testid="stSidebar"] {
+                min-width: 420px !important;
+                max-width: 450px !important;
+            }
+            [data-testid="stSidebar"] .stCaption {
+                font-size: 0.88rem !important;
+                line-height: 1.4 !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.sidebar.image("https://img.icons8.com/color/96/000000/bank-building.png", width=65)
     st.sidebar.title("⚙️ Kontrol Paneli")
-    st.sidebar.caption("💡 Kolay Analiz: Sırasıyla 1, 2 ve 3. adımları seçip **🚀 ANALİZİ BAŞLAT** butonuna basın.")
+    st.sidebar.caption("💡 Kolay Analiz: Sırasıyla 1. ve 2. adımları seçip **🚀 ANALİZİ BAŞLAT** butonuna basın.")
 
     st.sidebar.markdown("---")
 
@@ -44,44 +61,114 @@ def render_sidebar() -> SidebarState:
 
     st.sidebar.markdown("---")
 
-    # 2. Adım: Çalıştırma Modu
-    st.sidebar.markdown("### 2️⃣ Çalıştırma Modu")
-    exec_mode = st.sidebar.radio(
-        "Analiz Yöntemi",
-        options=["⚡ Gerçek Canlı API (Bulut / HF)", "🧪 Mock Test Modu (Hızlı Simülasyon)"],
-        index=0,
-        help="API anahtarlarınız hazırsa Gerçek API, ücretsiz hızlı test için Mock Simülasyon seçin."
-    )
-    is_mock_mode = "Mock" in exec_mode
-
-    st.sidebar.markdown("---")
-
-    # 3. Adım: Modeller
-    st.sidebar.markdown("### 3️⃣ AI Modelleri")
+    # 2. Adım: Modeller
+    st.sidebar.markdown("### 2️⃣ AI Model Seçimi & Teknik Metrikler")
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
     selected_model_ids = []
 
-    st.sidebar.caption("Kıyaslamak istediğiniz AI modellerini işaretleyin:")
+    bdr_karakter = len(bdr_content)
+    bdr_kelime = len(bdr_content.split())
+    bdr_token = round(bdr_karakter / 3.8)
+    st.sidebar.caption(
+        f"📄 **Dosya:** `{bdr_name}`  \n"
+        f"📊 **BDR Hacmi:** {bdr_karakter:,} Karakter · {bdr_kelime:,} Kelime (`~{bdr_token:,} Token`)"
+    )
 
-    for m in all_models:
-        model_id = m.get("id")
-        model_name = m.get("name")
-        default_checked = m.get("enabled", False)
-        if st.sidebar.checkbox(f"{model_name}", value=default_checked, key=f"chk_{model_id}"):
-            selected_model_ids.append(model_id)
+    # Modelleri Kategorilere Ayırma
+    cloud_models = [m for m in all_models if m.get("provider") in ("gemini", "openai", "anthropic")]
+    hf_models = [m for m in all_models if m.get("provider") == "huggingface"]
+    mock_models = [m for m in all_models if m.get("provider") == "mock"]
+
+    tab_cloud, tab_hf, tab_mock = st.sidebar.tabs([
+        "☁️ Bulut API",
+        "🤗 Açık Kaynak",
+        "🧪 Simülasyon"
+    ])
+
+    def _render_model_cards(model_list: List[dict]):
+        for m in model_list:
+            model_id = m.get("id")
+            model_name = m.get("name")
+            provider = m.get("provider", "")
+            deg = Config.model_bdr_degerlendirmesi(m, bdr_karakter)
+
+            secildi = st.checkbox(
+                f"{deg['rozet']} {model_name}",
+                value=m.get("enabled", False),
+                key=f"chk_{model_id}",
+            )
+
+            # Detaylı Teknik Özellikler Metin Kutusu (Standart Yapay Zeka Terimleri)
+            st.caption(
+                f"📥 **Context Window:** {deg['context_window_str']}  \n"
+                f"📤 **Max Output Tokens:** {deg['max_tokens_str']}  \n"
+                f"🎯 **BDR Suitability:** {deg['bdr_etiketi']}  \n"
+                f"🔑 **API Key Status:** {deg['api_key_status']}"
+            )
+
+            if deg["uyarilar"]:
+                with st.expander("ℹ️ Detay & Uyarılar"):
+                    for u in deg["uyarilar"]:
+                        st.write(f"- {u}")
+
+            st.markdown("---")
+
+            if secildi:
+                selected_model_ids.append(model_id)
+
+    with tab_cloud:
+        _render_model_cards(cloud_models)
+
+    with tab_hf:
+        _render_model_cards(hf_models)
+
+    with tab_mock:
+        _render_model_cards(mock_models)
+
+    mock_model_ids = {m.get("id") for m in mock_models if m.get("id")}
+    is_mock_mode = bool(selected_model_ids) and all(m_id in mock_model_ids for m_id in selected_model_ids)
 
     if not selected_model_ids:
-        st.sidebar.warning("⚠️ Lütfen analiz için en az bir model seçiniz!")
+        st.sidebar.warning("⚠️ Lütfen analiz için en az bir AI modeli seçiniz!")
 
     st.sidebar.markdown("---")
 
-    # 4. Gelişmiş Ayarlar (Opsiyonel)
-    with st.sidebar.expander("🎛️ Gelişmiş Model Ayarları (Opsiyonel)"):
-        st.caption("AI modellerinin yaratıcılık ve ceza parametrelerini ayarlayabilirsiniz:")
-        override_temp = st.slider("Temperature (Sıcaklık)", 0.0, 1.0, 0.1, 0.05, help="Düşük değer daha tutarlı ve analitik sonuçlar üretir.")
-        override_top_p = st.slider("Top-P (Sampling)", 0.1, 1.0, 0.9, 0.05)
-        override_rep_penalty = st.slider("Repetition Penalty", 1.0, 1.5, 1.05, 0.05)
+    # 3. Gelişmiş Ayarlar (Opsiyonel)
+    with st.sidebar.expander("🎛️ 3️⃣ Gelişmiş Model Ayarları (Opsiyonel)"):
+        st.caption("AI modellerinin analitik hassasiyet ve ceza parametrelerini özelleştirebilirsiniz:")
+        
+        override_temp = st.slider(
+            "Temperature (Sıcaklık)",
+            0.0, 1.0, 0.1, 0.05,
+            help=(
+                "🎯 **Temperature (0.0 - 1.0):** Modelin yanıt üretirken gösterdiği rastgelelik/yaratıcılık seviyesi.\n\n"
+                "• **0.0 - 0.1 (Tavsiye Edilen):** Deterministik ve matematiksel hassasiyet. Modele verilen Prompt'a ve BDR metnine %100 sadık kalır, uydurma/hallüsinasyon riskini engeller.\n\n"
+                "• **0.7 - 1.0:** Serbest metin yazımı (Finansal analiz ve Kredi Komite raporları için tavsiye EDİLMEZ)."
+            )
+        )
+        st.caption("ℹ️ **Önerilen (0.10):** Prompta ve BDR metnine %100 sadık deterministik analiz.")
+
+        override_top_p = st.slider(
+            "Top-P (Nucleus Sampling)",
+            0.1, 1.0, 0.9, 0.05,
+            help=(
+                "🔍 **Top-P (0.1 - 1.0):** Modelin kelime seçimi yaparken dikkate aldığı olasılık havuzunun genişliği.\n\n"
+                "• **0.90 (Tavsiye Edilen):** En yüksek olasılıklı finansal terim havuzunu kullanarak anlamsız kelime sapmalarını filtreler ve dil akıcılığını korur."
+            )
+        )
+        st.caption("ℹ️ **Önerilen (0.90):** Finansal literatüre ve terimlere uygun kelime seçimi.")
+
+        override_rep_penalty = st.slider(
+            "Repetition Penalty (Tekrar Cezası)",
+            1.0, 1.5, 1.05, 0.05,
+            help=(
+                "🚫 **Repetition Penalty (1.0 - 1.5):** Modelin aynı kelimeleri veya cümle kalıplarını üst üste tekrarlamasını engelleyen ceza katsayısı.\n\n"
+                "• **1.00:** Ceza yok (Bazı açık kaynak modellerde aynı cümleyi döngüye sokabilir).\n\n"
+                "• **1.05 (Tavsiye Edilen):** Kelime döngülerini önler, akıcı ve özgün cümle yapısı sağlar."
+            )
+        )
+        st.caption("ℹ️ **Önerilen (1.05):** Gereksiz kelime ve cümle tekrarlarını önler.")
 
     hyperparams = {
         "temperature": override_temp,

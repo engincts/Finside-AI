@@ -88,15 +88,39 @@ class HuggingFaceProvider(BaseProvider):
                         temperature=self.temperature,
                         top_p=self.top_p,
                     )
-                except Exception as text_err:
-                    raise RuntimeError(f"HuggingFace modellerinden yanıt alınamadı: {text_err}")
+                except Exception:
+                    pass
+
+            # 4. Deneme: Yüksek Performanslı Serverless Fallback Modelleri
+            if not raw_text:
+                for fb_model in self.FALLBACK_MODELS:
+                    if fb_model == self.model_name:
+                        continue
+                    try:
+                        fb_client = InferenceClient(model=fb_model, token=self.api_key)
+                        comp = fb_client.chat.completions.create(
+                            messages=[
+                                {"role": "system", "content": strict_system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            max_tokens=self.max_tokens,
+                            temperature=self.temperature,
+                            top_p=self.top_p,
+                            stream=False,
+                        )
+                        if comp and comp.choices and comp.choices[0].message:
+                            raw_text = comp.choices[0].message.content
+                            if raw_text:
+                                break
+                    except Exception:
+                        continue
 
             if raw_text and raw_text.strip():
                 report = self._parse_report(raw_text)
                 report.is_mock_fallback = False
                 return report
             else:
-                raise RuntimeError("HuggingFace modelinden boş yanıt döndü.")
+                raise RuntimeError("HuggingFace modellerinden yanıt alınamadı.")
 
         except Exception as err:
             raise RuntimeError(f"❌ HuggingFace API Hatası ({self.model_name}): {err}")

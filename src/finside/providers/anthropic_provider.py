@@ -13,7 +13,9 @@ class AnthropicProvider(BaseProvider):
     """Anthropic Claude API entegrasyon sağlayıcısı (Forced Tool-Use ile Yapılandırılmış Çıktı)."""
 
     TOOL_NAME = "bdr_risk_raporu"
-    MAX_OUTPUT_TOKENS = 32000
+    # Claude Sonnet 4.5 native çıktı üst sınırı 64K (beta başlığı gerektirmez). 32K,
+    # risk yoğun BDR'lerde tek geçişte yetmiyordu.
+    MAX_OUTPUT_TOKENS = 64000
 
     FALLBACK_CLAUDE_MODELS = [
         "claude-sonnet-4-5",

@@ -72,33 +72,53 @@ class DenetciGorusTuru(str, Enum):
 
 
 class KomiteKararEgilimi(str, Enum):
-    """Kredi Komitesi Karar Eğilimi."""
-    OLUMLU = "Olumlu (Kredi Tahsis Edilebilir)"
+    """Kredi Komitesi Karar Eğilimi ve Tahsis Seviyesi."""
+    OLUMLU = "Olumlu (Koşulsuz Tahsis / Standart Limit)"
     SARTLI_OLUMLU = "Şartlı Olumlu (Ek Teminat / Kısıtlayıcı Taahhüt-Covenant İle)"
-    OLUMSUZ = "Olumsuz (Yüksek Kalitatif Risk)"
+    SARTLI_TAAHHUTLU = "Şartlı Olumlu (Finansal Covenant / Taahhüt Şartlı)"
+    SARTLI_TEMINATLI = "Şartlı Olumlu (Ek Teminat / Limit Kısıtlaması Bağlı)"
+    ASKIDA_EK_INCELEME = "Askıda (Ek Denetim / Hukuki Görüş İsteniyor)"
+    OLUMSUZ = "Olumsuz (Yüksek Kalitatif Risk / Red)"
     BELIRSIZ = "Belirsiz (Model Karar Üretmedi)"
+
+
+class FinansalRasyoOzeti(BaseModel):
+    """Mizan ve Gelir Tablosundan hesaplanan likidite, borçluluk ve karlılık rasyoları."""
+    cari_oran: Optional[str] = Field(None, description="Cari oran.")
+    likidite_orani: Optional[str] = Field(None, description="Likidite / Asit-test oranı.")
+    kaldirac_orani: Optional[str] = Field(None, description="Kaldıraç oranı (Toplam Borç / Pasif).")
+    net_borc_favok: Optional[str] = Field(None, description="Net Borç / FAVÖK çarpanı.")
+    ozkaynak_orani: Optional[str] = Field(None, description="Özkaynak / Toplam Pasif.")
+    net_doviz_pozisyonu: Optional[str] = Field(None, description="Net yabancı para pozisyonu tutarı.")
 
 
 class BDRRiskItem(BaseModel):
     """Tekil BDR Kalitatif Risk Kalemi Nesnesi."""
-    risk_kategorisi: RiskKategorisi = Field(..., description="Risk kaleminin dahil olduğu ana TFRS/BDR kategorisi.")
+    risk_kategorisi: RiskKategorisi = Field(default=RiskKategorisi.DIGER_KALITATIF_RISK, description="Risk kaleminin dahil olduğu ana TFRS/BDR kategorisi.")
     dipnot_referansi: Optional[str] = Field(None, description="Ait olduğu BDR dipnot referansı.")
-    baslik: str = Field(..., description="Risk kaleminin kısa ve net başlığı.")
-    detay: str = Field(..., description="BDR dipnotundaki riskin ayrıntıları.")
+    baslik: str = Field(default="Kalitatif Risk Kalemi", description="Risk kaleminin kısa ve net başlığı.")
+    detay: str = Field(default="Dipnot detayı belirtilmedi.", description="BDR dipnotundaki riskin ayrıntıları.")
     tutar_bilgisi: Optional[str] = Field(None, description="Riskin parasal tutarı (TL/USD/EUR).")
-    etki_degerlendirmesi: str = Field(..., description="Riskin borç ödeme veya likiditeye etkisi.")
-    risk_derecesi: RiskDerecesi = Field(..., description="Risk derece sınıfı.")
-    kaynak_metin_alintisi: str = Field(..., description="BDR metninden doğrudan alıntı.")
+    etki_degerlendirmesi: str = Field(default="Borç ödeme kapasitesi üzerindeki olası etki.", description="Riskin borç ödeme veya likiditeye etkisi.")
+    risk_derecesi: RiskDerecesi = Field(default=RiskDerecesi.ORTA, description="Risk derece sınıfı.")
+    kaynak_metin_alintisi: str = Field(default="BDR metin alıntısı bulunamadı.", description="BDR metninden doğrudan alıntı (tek ve net kısa cümle).")
+    ek_kanitlar: Optional[List[str]] = Field(default_factory=list, description="Varsa ek kısa kanıt alıntıları ('...' kullanmadan ayrı cümle parçaları).")
     dogrulanmadi: bool = Field(False, description="Kaynak alıntısının ham metinde doğrulanma durumu.")
     kaynak_modeller: List[str] = Field(default_factory=list, description="Bu riski tespit eden LLM modelleri.")
+
+    @field_validator("kaynak_metin_alintisi", mode="before")
+    @classmethod
+    def fallback_kaynak_alintisi(cls, v: Any) -> str:
+        if not v or not str(v).strip():
+            return "BDR metin alıntısı bulunamadı."
+        return str(v)
 
     @field_validator("risk_kategorisi", mode="before")
     @classmethod
     def normalize_risk_kategorisi(cls, v: Any) -> str:
+        if not v or not str(v).strip():
+            return RiskKategorisi.DIGER_KALITATIF_RISK.value
         if isinstance(v, str):
-            # Python'da "İ".lower() araya U+0307 combining nokta bırakır; bu, "ilişkili"
-            # gibi i-başlı anahtar kelimelerin büyük-İ girdilerine karşı eşleşmesini
-            # bozar. Her iki tarafı da bu noktadan arındır.
             v_clean = sadelestir_tr(v)
             for cat in RiskKategorisi:
                 cat_clean = sadelestir_tr(cat.value)
@@ -152,11 +172,13 @@ class BDRRiskItem(BaseModel):
             ):
                 return RiskKategorisi.KOSULLU_YUKUMLULUK.value
             return RiskKategorisi.DIGER_KALITATIF_RISK.value
-        return v
+        return RiskKategorisi.DIGER_KALITATIF_RISK.value
 
     @field_validator("risk_derecesi", mode="before")
     @classmethod
     def normalize_risk_derecesi(cls, v: Any) -> str:
+        if not v or not str(v).strip():
+            return RiskDerecesi.ORTA.value
         if isinstance(v, str):
             v_clean = v.strip().lower()
             if "kritik" in v_clean:
@@ -168,7 +190,7 @@ class BDRRiskItem(BaseModel):
             if "düşük" in v_clean or "dusuk" in v_clean or "low" in v_clean:
                 return RiskDerecesi.DUSUK.value
             return RiskDerecesi.ORTA.value
-        return v
+        return RiskDerecesi.ORTA.value
 
 
 _ALAN_URETILMEDI = "(Model bu alanı üretmedi)"
@@ -185,6 +207,11 @@ class BDRRiskAnalysisReport(BaseModel):
     denetim_firmasi: Optional[str] = Field(None, description="Denetim kuruluşu.")
     denetci_gorusu: Optional[DenetciGorusTuru] = Field(DenetciGorusTuru.OLUMLU, description="Denetçi görüşü.")
     tespit_edilen_riskler: List[BDRRiskItem] = Field(default_factory=list, description="Risk kalemleri.")
+    # Hibrit Yapay Zeka Mimarisi: ML.NET Sayısal Kredi Skorlama ve Bilanço/Mizan Verileri
+    ml_sayisal_kredi_skoru: Optional[float] = Field(None, description="ML.NET tabanlı makine öğrenmesi sayısal kredi skoru (0-100).")
+    sayisal_skor_kategorisi: Optional[str] = Field(None, description="Sayısal skor risk seviyesi (Düşük / Orta / Yüksek Risk).")
+    finansal_rasyo_ozeti: Optional[FinansalRasyoOzeti] = Field(None, description="Mizan ve Gelir Tablosundan hesaplanan likidite, borçluluk ve karlılık rasyoları.")
+
     genel_kredi_risk_ozeti: str = Field(_ALAN_URETILMEDI, description="Risk özeti.")
     komite_tavsiyesi_ve_sartlar: List[str] = Field(default_factory=list, description="Komite tavsiyeleri.")
     karar_egilimi: KomiteKararEgilimi = Field(KomiteKararEgilimi.BELIRSIZ, description="Karar eğilimi.")
@@ -209,13 +236,17 @@ class BDRRiskAnalysisReport(BaseModel):
     @field_validator("karar_egilimi", mode="before")
     @classmethod
     def normalize_karar_egilimi(cls, v: Any) -> str:
-        if v is None:
+        if v is None or not str(v).strip():
             return KomiteKararEgilimi.BELIRSIZ.value
         if isinstance(v, str):
             v_clean = v.strip().lower()
-            if "şartlı" in v_clean or "sartli" in v_clean or "covenant" in v_clean:
-                return KomiteKararEgilimi.SARTLI_OLUMLU.value
-            if "olumsuz" in v_clean or "reddedil" in v_clean or "rejected" in v_clean:
+            if "askı" in v_clean or "pended" in v_clean or "ek inceleme" in v_clean or "hukuki görüş" in v_clean:
+                return KomiteKararEgilimi.ASKIDA_EK_INCELEME.value
+            if "teminat" in v_clean or "rehin" in v_clean or "ipotek" in v_clean or "kısıt" in v_clean:
+                return KomiteKararEgilimi.SARTLI_TEMINATLI.value
+            if "taahhüt" in v_clean or "covenant" in v_clean or "şartlı" in v_clean or "sartli" in v_clean:
+                return KomiteKararEgilimi.SARTLI_TAAHHUTLU.value
+            if "olumsuz" in v_clean or "red" in v_clean or "rejected" in v_clean:
                 return KomiteKararEgilimi.OLUMSUZ.value
             if "olumlu" in v_clean:
                 return KomiteKararEgilimi.OLUMLU.value

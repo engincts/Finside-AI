@@ -68,7 +68,9 @@ ui_state = render_sidebar()
 
 # Handle Benchmark Run Action
 if ui_state.run_btn and ui_state.selected_model_ids:
-    with st.spinner("🔄 BDR Metni Analiz Ediliyor ve Model Çıktıları Üretiliyor..."):
+    status_box = st.status("🚀 **BDR Analiz Süreci Başlatıldı...**", expanded=True)
+    with status_box:
+        st.write("📄 **Adım 1:** BDR metni ayrıştırılıyor ve model parametreleri yapılandırılıyor...")
         request = BenchmarkRequest(
             selected_model_ids=ui_state.selected_model_ids,
             bdr_content=ui_state.bdr_content,
@@ -78,16 +80,20 @@ if ui_state.run_btn and ui_state.selected_model_ids:
             system_prompt=st.session_state.active_system_prompt,
             user_template=st.session_state.active_user_template,
         )
+        st.write(f"🤖 **Adım 2:** Seçilen {len(ui_state.selected_model_ids)} AI modeli eşzamanlı olarak metni ve dipnotları tarıyor...")
         results_list, metrics_summary_list, zaman_asimi, session_dir = BenchmarkService.run_benchmark_suite(request)
+        st.write("🔍 **Adım 3:** Model çıktıları konsolide ediliyor ve QA kuralları doğrulanıyor...")
+        st.write(f"💾 **Adım 4:** Raporlar diske yazıldı: `{session_dir}`")
+        status_box.update(label="✅ **Analiz Başarıyla Tamamlandı!**", state="complete", expanded=False)
 
-        if zaman_asimi:
-            st.warning(f"⏱️ {len(zaman_asimi)} model zaman aşımına takıldı: {', '.join(zaman_asimi)}")
-        if results_list:
-            st.session_state.analysis_results = results_list
-            st.session_state.metrics_summary = metrics_summary_list
-            st.success(f"✅ Analiz Tamamlandı. Raporlar: `{session_dir}`")
-        else:
-            st.error("❌ Hiçbir model zamanında yanıt veremedi.")
+    if zaman_asimi:
+        st.warning(f"⏱️ {len(zaman_asimi)} model zaman aşımına takıldı: {', '.join(zaman_asimi)}")
+    if results_list:
+        st.session_state.analysis_results = results_list
+        st.session_state.metrics_summary = metrics_summary_list
+        st.success(f"✅ Analiz Tamamlandı. Çıktılar: `{session_dir}`")
+    else:
+        st.error("❌ Hiçbir model zamanında yanıt veremedi.")
 
 # Render Main View Tabs
 t1, t2, t3, t4, t5 = st.tabs([

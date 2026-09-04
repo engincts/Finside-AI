@@ -7,7 +7,7 @@ Reconciler LLM çağrısı. LLM'in düşürdüğü kalemler recall için geri ek
 import json
 from typing import List, Tuple
 
-from finside.dedupe import ayni_baslik_index
+from finside.dedupe import ayni_baslik_index, dedup_risk_dicts, rollup_ele
 from finside.loaders.prompt_loader import PromptLoader
 from finside.pipeline.llm_call import rapor_cagrisi
 from finside.pipeline.state import TraceKaydi
@@ -23,7 +23,10 @@ def mekanik_birlestir(riskler: List[dict]) -> Tuple[List[dict], List[dict]]:
     kumeler: List[dict] = []
     celiskiler: List[dict] = []
 
-    for risk in riskler:
+    # Ön-birleştirme öncesi deterministik deduplikasyon ve roll-up temizliği
+    temiz_riskler = dedup_risk_dicts(riskler)
+
+    for risk in temiz_riskler:
         baslik = _baslik(risk)
         if not baslik:
             continue
@@ -82,4 +85,7 @@ def uzlastir(
 
     llm_basliklar = [_baslik(r) for r in llm_riskler]
     geri_eklenen = [r for r in on_birlesik if ayni_baslik_index(_baslik(r), llm_basliklar) is None]
-    return llm_riskler + geri_eklenen, celiskiler, [sonuc.trace]
+    
+    # Post-hoc deterministik guard: LLM'in uydurabileceği özet/roll-up kalemlerini reddet
+    nihai_liste = rollup_ele(llm_riskler + geri_eklenen)
+    return nihai_liste, celiskiler, [sonuc.trace]
