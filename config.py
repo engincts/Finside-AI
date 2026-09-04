@@ -58,6 +58,11 @@ class Config:
     COVERAGE_THRESHOLD: float = 0.80
     JACCARD_THRESHOLD: float = 0.60
     NEAR_DUP_THRESHOLD: float = 0.88
+    # Başlık kümeleme eşiği (rapidfuzz token_sort_ratio, 0-100). Türkçe çoğul eki
+    # (-lar/-ler) ve birim yazım farkı ("116.737 TL" vs "116.737 bin TL") gibi
+    # yüzeysel farkları aynı kaleme indirir (~92-96), ama "alacaklar" vs "borçlar"
+    # gibi karşıt kalemleri ayrı tutar (~86). 90 bu ikisini ayıran eşik.
+    BASLIK_BENZERLIK_ESIGI: int = 90
     EMBED_API_KEY_ENV: str = "OPENAI_API_KEY"
 
     # 5. Segmentasyon Ayarları (BDR Segmentation)

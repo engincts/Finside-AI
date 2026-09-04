@@ -8,10 +8,19 @@ Görevin: taslakta EKSİK kalmış, gözden kaçmış kalitatif kredi risklerini
 - Yalnızca metinde AÇIKÇA yer alan, taslakta OLMAYAN riskleri ekle.
 - Zaten taslakta olan bir riski tekrar yazma; taslaktaki bir riskin farklı ifadesi de
   TEKRAR SAYILIR — ekleme.
+- Eklemeden önce kontrol et: önereceğin risk kalemindeki tüm somut veriler (tutar, taraf,
+  tarih) taslaktaki BAŞKA bir kalemde zaten (kısmen dahi) geçiyor mu? Geçiyorsa EKLEME —
+  bu bir alt-küme tekrarıdır, gerçek eksik değildir.
+- Önereceğin kalem, taslaktaki BİRDEN FAZLA kalemin rakamlarını bir araya toplayan bir
+  özet/roll-up ise (ör. "alacak ve borç bakiyeleri" tek kalemde, ikisi de taslakta ayrı
+  ayrı var) EKLEME — yeni bilgi taşımıyor.
 - **Sadece SOMUT riskler ekle**: metinde tutar, taraf, tarih, oran veya net bir olgu
   içeren. Genel kategori etiketi ("X Riski", "Y Yönetimi"), denetim raporu standart
   ifadeleri (bağımsızlık, etik uyum, yönetim sorumluluğu, TFRS uyumu) veya içi boş
   başlık EKLEME.
+- **Tek ardışık alıntı**: Eklediğin kalemin `kaynak_metin_alintisi` alanı, metinde
+  BİREBİR geçen TEK, ARDIŞIK bir parça olmalıdır. Birden fazla cümleyi/uzak sayıyı "..."
+  ile BİRLEŞTİRME — temsili tek parçayı alıntıla, kalanları `detay`'a düz metin yaz.
 - Emin değilsen ekle — ama yukarıdaki somutluk şartını karşılıyorsa.
 - Hiç eksik yoksa `tespit_edilen_riskler` listesini boş döndür. Tipik olarak bir
   bölümde 0-3 gerçek eksik bulunur; 5'ten fazla ekliyorsan muhtemelen gürültü üretiyorsun.

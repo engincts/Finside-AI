@@ -39,7 +39,11 @@ def main():
         from finside.pipeline.batch import calistir_batch
 
         modeller = [m.strip() for m in args.map_models.split(",")] if args.map_models else None
-        ozet = calistir_batch(args.batch, secili_modeller=modeller)
+        ozet = calistir_batch(
+            args.batch,
+            secili_modeller=modeller,
+            yaz=lambda satir: print(satir, flush=True),
+        )
         print("=" * 80)
         print(f"📦 Pipeline Batch Tamamlandı — {len(ozet)} BDR")
         for s in ozet:

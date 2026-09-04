@@ -4,6 +4,238 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-04 — Kalite kalibrasyonu: taksonomi + tekrar-dedup + alıntı bütünlüğü
+
+Borusan 2024 BDR altı turda gerçek API ile koşuldu (24 → 23 → 35 → 19 → 32 → 32 risk).
+Mimari doğru, mock fallback yok. **Not:** `config.json`'da `pipeline` rolleri şu an
+tümü `gpt-oss-120b` (task dokümanındaki `gpt-4o-mini` varsayımı güncel değil) — critic
+de gpt-oss-120b, bu critic'in agresif "eksik ekleme" davranışını açıklıyor.
+
+**6. tur (bu oturumun düzeltmeleri sonrası):** SORUN 1/1C ✅ **"Diğer" 0 kalem**, Kıdem
+Tazminatı → Koşullu Yükümlülükler, yeni enum adı ("…Kur ve Faiz Oranı Riski") aktif.
+SORUN 2C roll-up kalemi raporda YOK. SORUN 3 (orijinal "..." hali) ✅ kalıcı. 3 ana
+sorun kapandı.
+
+**Kalan ince ayar:** SORUN 3B (grounding sayı/boşluk format toleransı — bu oturumda
+çözüldü), SORUN 2D (critic tablo satırı kazıyor + map'i 2x'liyor — açık, kullanıcı
+öncelik vermedi).
+
+### SORUN 1 — "Diğer Kalitatif Risk" %33 (8/24) — ✅ ÇÖZÜLDÜ (2. tur doğrulandı)
+
+`schemas.RiskKategorisi` enum'ına 5 yeni kategori: `VARLIK_DEGER_DUSUKLUGU_VE_SEREFIYE`,
+`MUHASEBE_TAHMINI_VE_HASILAT`, `IC_KONTROL_ZAFIYETI`, `TUREV_VE_HEDGE_ISLEMLERI`,
+`ISLETME_BIRLESMESI` (hepsi `DIGER_KALITATIF_RISK`'ten önce; "Diğer" son sırada fallback).
+
+- **`schemas.normalize_risk_kategorisi`** + **`pipeline/keyword_map.KATEGORI_ANAHTARLARI`**:
+  yeni kategoriler için geri/ileri anahtar-kelime eşlemesi (şerefiye, iç kontrol,
+  türev/forward/hedge, birleşme/satın alma, hasılat). `türev` kontrolü `döviz`'den ÖNCE.
+  `birleşme`/`devralma` FAALIYET'ten çıkarılıp ISLETME_BIRLESMESI'ye; FAALIYET'e
+  `önemli belirsizlik` eklendi.
+- **`prompts/bdr_analyst_v1.md`**: kategori listesine 10-14. maddeler + madde 9 notu.
+
+**2. tur (23 risk):** "Diğer" hiç yok. Yeni kategoriler aktif ve doğru.
+
+### SORUN 1B — 3. turda kısmi nüks (%33 → %11, 4/35 kalem) — ✅ ÇÖZÜLDÜ (4. tur: "Diğer" 0)
+
+3. tur çıktısında 4 kalem hâlâ yanlış kategoride (biri — Sermaye Artırımı — önceki turda
+DOĞRU kategorideydi → miscategorization tutarsız).
+
+- **`schemas.normalize_risk_kategorisi`** + **`keyword_map`**:
+  - `üst yönetim` / `kilit yönetici` / `yönetim kurulu ücret` → `ILISKILI_TARAF`
+    (IAS 24). Bu kontrol `kur` kontrolünden ÖNCE ("yönetim kurulu" → "kur" çakışmasını
+    önlemek için).
+  - `libor` / `faiz oran(ı)` / `faiz riski` → `KUR_VE_DOVIZ_RISKI`.
+  - `sermaye artır` / `sermaye artış` → `FAALIYET_SUREKLILIGI_VE_SONRAKI_OLAYLAR`.
+- **`prompts/bdr_analyst_v1.md`**: madde 5'e "faiz oranı/Libor buraya", madde 7'ye
+  "üst yönetim ücretleri IAS 24 → İlişkili Taraf", madde 9'a "sermaye artırımı = bilanço
+  sonrası olaylar, her koşumda aynı yer" notları. Yeni ilke: **"Risk ≠ Bilanço Kalemi"**
+  — `etki_degerlendirmesi`'ne somut bir borç ödeme/likidite/teminat etkisi
+  yazılamıyorsa kalem `tespit_edilen_riskler`'e girmez ("Diğer Dönen Varlıklar: X TL"
+  türü salt rakam bildirimi risk değil).
+
+### SORUN 2 — Reconciler/dedup birebir-tekrarı kaçırıyor — 🔴 KÖK NEDEN DÜZELTİLDİ
+
+1. tur: alt-küme tekrarı (#7 ⊇ #14). 3. tur daha temel kanıt: *"İlişkili Taraflardan
+Ticari Alacaklar" (4.156 TL)* vs *"İlişkili taraflardan ticari alacak" (4.156 bin TL)* —
+aynı gerçek, aynı rakam, iki ayrı kalem. Aynısı ticari borçlarda (116.737).
+Kök neden: `reconciler._anahtar` (ve `dedupe.dedup_risk_dicts`) **birebir string**
+eşleşmesi arıyordu; Türkçe çoğul eki (-lar/-ler) + birim yazımı ("TL" vs "bin TL")
+string'i eşitlemiyor → mekanik ön-birleştirme kaçırıyor.
+
+- **`config.BASLIK_BENZERLIK_ESIGI = 90`** (yeni sabit). Ölçüm: "alacaklar"↔"alacak"
+  ≈96, "borçlar"↔"borç" ≈92 (birleşmeli); "alacaklar"↔"borçlar" ≈86 (ayrı kalmalı).
+  90 bu ikisini ayırıyor.
+- **`dedupe.ayni_baslik_index`** (yeni, public): rapidfuzz `token_sort_ratio ≥ eşik`
+  ile ilk eşleşen aday indeksi. reconciler + critic + `dedup_risk_dicts` üçü de bunu
+  kullanıyor (tek kaynak).
+- **`pipeline/reconciler.py`**: `_anahtar` (birebir dict-anahtar) → `mekanik_birlestir`
+  eşik-bazlı liste kümelemesi; `uzlastir` içindeki `kaynak_modeller` haritası ve
+  `geri_eklenen` de fuzzy.
+- **`pipeline/critic.py`**: `_kapsanmayan` (ipucu üretimi) ve critic'in kendi eklediği
+  kalemi taslakla karşılaştırması artık fuzzy — near-dup'ı hiç eklememesi için
+  (re-add döngüsünün kaynağı buydu).
+- **`dedupe.dedup_risk_dicts`**: aynı fuzzy kümeleme (global sentez dedup'ı da aynı
+  hatayı taşıyordu; 3. tur çiftleri buradan da geçmişti).
+- **`prompts/reconciler_v1.md`**: somut örnek ("... 4.156 TL" ≡ "... 4.156 bin TL").
+- Alt-küme prompt maddeleri (1. tur) `reconciler_v1.md` + `critic_v1.md`'de duruyor.
+  Deterministik `dedupe.is_subset()` hâlâ Faz 11.5.
+
+**4. tur:** "birebir ikiz başlık" deseni YOK (5 İlişkili Taraf kaleminden 4'ü gerçekten
+ayrı bilanço satırı — 4.156 / 116.737 / 720 / 1.499 bin TL, meşru). Fuzzy dedup tuttu.
+
+### SORUN 2C — "roll-up/özet" kalemi — 🟢 DETERMİNİSTİK ÇÖZÜM (prompt yetmedi, 3 kez nüksetti)
+
+*"İlişkili taraflardan ticari alacak ve borç bakiyeleri"* (4.156 + 116.737 bin TL) =
+listedeki 1. ve 2. kalemin rakamları birlikte. **4., 5. VE 7. turda tekrar etti** →
+prompt talimatı bu spesifik deseni güvenilir bastıramıyor.
+
+- **Prompt (4. turda eklendi):** `reconciler_v1.md` + `critic_v1.md` "roll-up sayma/
+  ekleme" maddesi + somut örnek; `synthesis_v1.md` "konsolidasyonu özet metnine yaz"
+  notu. Bunlar duruyor ama tek başına yetmiyor.
+- **`dedupe.rollup_ele`** (deterministik, `synthesis.sentezle` içinde `dedup_risk_dicts`
+  sonrası): `tutar_bilgisi`+`detay`+`baslik`'ten 4+ haneli sayıları (yıl hariç, ayıraç
+  temizlenir) çıkarır. Bir kalemin **HER** sayısı, aynı kategorideki başka ≥2 kalemde de
+  geçiyorsa (kendine özgü hiç sayı getirmiyor) → çıkar.
+- **7. tur sonrası güçlendirildi:** eski mantık "tekil kalemin TÜM sayıları roll-up'ın
+  içinde" idi — tekil kalemler ham tablo satırından fazladan sayı taşıyınca (`"...34
+  4.156 296.673 118 10.078"`) eşleşme bozuluyordu. Yeni mantık sayı-bazlı kapsama:
+  roll-up'ın her sayısı ayrı ayrı ≥2 başka kalemde aranır; "Azami Kredi Riski" gibi
+  kendine özgü tutarı olan kalemler korunur.
+- Birim test (`check_rollup.py`): kanonik roll-up (tekiller fazla sayılı) 4→3;
+  regresyon — Azami Kredi Riski korunur, tek kapsayan elenmez, farklı kategori kapsamaz.
+
+### SORUN 1C — 2 yeni "Diğer" boşluğu (5. tur) — ✅ ÇÖZÜLDÜ
+
+*Faiz Oranı Riski* (Libor'dan bağımsız) ve *Kıdem Tazminatı Karşılığı* → "Diğer".
+Kök neden: strict-şema model `risk_kategorisi`'ni doğrudan "Diğer" seçince
+`normalize_risk_kategorisi` (yalnızca enum-dışı serbest metinde çalışır) baypas oluyor.
+
+- **Enum:** `KUR_VE_DOVIZ_RISKI` değeri → *"Net Yabancı Para Pozisyonu, Kur ve Faiz
+  Oranı Riski"*. Artık "Faiz Oranı Riski" ilk-döngü substring eşleşmesiyle doğru gidiyor.
+- **`normalize_risk_kategorisi` + `keyword_map`:** `kıdem tazminatı` / `çalışan hakları`
+  / `emeklilik yükümlülü` → `KOSULLU_YUKUMLULUK`. keyword_map'te DAVA'dan ÖNCE
+  ("kıdem tazminatı" hem "tazminat" hem "karşılık" içerdiğinden aksi halde DAVA'ya kaçar).
+- **`synthesis._kategori_kurtar`** (yeni): kategori "Diğer" ise `baslik`+`detay`'ı
+  `keyword_map.kategori_eslesmesi`'nden geçirip kurtarmayı dener. `rollup_ele` sonrası
+  çağrılıyor.
+- **`prompts/bdr_analyst_v1.md`:** madde 3'e kıdem tazminatı notu, madde 5 başlığı
+  "…Kur ve Faiz Oranı Riski".
+- **Doyum noktası:** "Diğer" oranı %33→%11→%6 yakınsıyor. Bundan sonra tekil kalem için
+  YENİ kategori açılmayacak; %5-10 "kabul edilebilir" eşik. SORUN 1 hattı kapandı.
+
+### SORUN 2D — critic map çıktısını 2x şişiriyor + finansal tablo satırı kazıyor — 🔴 AÇIK
+
+6. tur kanıtı: 32 kalemin **16'sı `Tespit Eden Modeller: critic`**. Critic'in eklediği
+ilk 7 kalemin `kaynak_metin_alintisi`'i düz ham finansal tablo satırı:
+- #1 `"Hasılat 25  55.065.658  42.175.476  1.689.466  1.741.173"`
+- #4 `"Türev Araçlar 10  7.517  13.637  213  463"`
+- #7 `"Net Dönem Karı (226.612)"`
+
+Bunlar denetim RİSK açıklaması değil, bilançonun kendisi. Ayrıca critic map kalemlerini
+farklı kelimelerle tekrar yazıyor (Türev 7.517: #4 critic + #11 gpt-oss + #27 gpt-oss)
+— fuzzy başlık-dedup @90 ("Türev Araçların Pozisyonları" vs "Vadeli döviz forward
+işlemleri") ve `rollup_ele` (tek sayı, roll-up değil) yakalamıyor.
+
+**Önerilen (henüz uygulanmadı):**
+- `critic_v1.md`: "verilen metin finansal tablo satırları içerebilir — ham sayı satırını
+  ('Hasılat 25 55.065.658 …') EKLEME; yalnızca düz cümleyle yazılmış dipnot açıklaması";
+  "bölüm başına EN FAZLA 1-2".
+- `config.max_critic_turu` 2 → 1.
+- Deterministik "tablo-satırı alıntısı" filtresi (alıntı >%55 rakam/boşluk & cümle yok →
+  ele) — critic çıktısına uygula.
+
+### Ek düzeltme — Türkçe "İ" küçük harf quirk'i (SORUN 1/1B'nin ortak kökü)
+
+Python'da `"İ".lower()` araya `U+0307` combining nokta koyuyor → `"ilişkili"`,
+`"işletme"`, `"ipotek"` gibi i-başlı anahtar kelimeler büyük-İ ile başlayan
+başlık/etiketlere eşleşmiyordu, kalem sessizce "Diğer"e / triyajda LLM'e düşüyordu.
+`schemas.sadelestir_tr` (yeni) bu noktayı arındırıyor; `normalize_risk_kategorisi`
+(iki taraf) ve `keyword_map.kategori_eslesmesi` / `boilerplate_mi` bunu kullanıyor.
+
+### SORUN 3 — Alıntılar "..." ile birleştirilmiş özetler — ✅ KAPANDI (3. + 4. tur stabil)
+
+2. tur: QA "Risklerin %52'si doğrulanamadı" bayrağı. Model metnin uzak noktalarını "..."
+ile birleştirip tek "birebir alıntı" sunuyor → `partial_ratio` ardışık bulamıyor.
+
+- **`prompts/bdr_analyst_v1.md` + `critic_v1.md` + `reconciler_v1.md`**: "Tek Ardışık
+  Alıntı" maddesi — "..." ile birleştirme YASAK; temsili tek parça, kalan rakamlar
+  `detay`'a.
+- **`pipeline/grounding.py`**: `ground_riskler` artık "..."/"…" farkında. `_AYIRAC`
+  regex'i ile parçalanır, her parça ayrı `partial_ratio`; TÜM parçalar eşik üstündeyse
+  `dogrulanmadi=False`. Ayraç yoksa / >6 parça / hepsi <12 karakterse alıntı bütün
+  kontrol edilir.
+
+**3.-6. tur:** her turda ≤%9 doğrulanamayan (%52 → 0-9). Orijinal "..." deseni kalıcı
+çözüldü — bu bölüme dokunulmadı.
+
+### SORUN 3B — sayı/tablo format uyuşmazlığı (yanlış-pozitif ret) — 🟢 İKİ KOLLU ÇÖZÜM
+
+6.-7. tur: 2-3/32 kalem doğrulanamadı, "..." YOK. İki alt-sebep, iki çözüm:
+1. **Roll-up kalemi = 3B kurbanı da** (Not 34'ün iki satırını birleştiriyor → hem tekrar
+   hem format uyuşmazlığı). `rollup_ele` bu kalemi eleyince 3B belirtisi de gidiyor.
+2. **Saf format farkı:** aşağıdaki `_sadelestir_metin`.
+
+6. tur: 3/32 kalem doğrulanamadı ama "..." YOK — sebep format farkı:
+- *"(155,737) (49,115) 7 (1,959,702)"* — model **virgül** binlik ayracı kullanmış,
+  kaynak Türkçe konvansiyonla **nokta** (155.737).
+- TRİ alt kalemleri: çok satırlı tablo, boşluk/hizalama kaynakla birebir uyuşmuyor.
+  İçerik gerçek (dokümanda manuel bulunmuştu) — halüsinasyon değil, `rapidfuzz` karakter
+  farkına takılıyor.
+
+- **`pipeline/grounding._sadelestir_metin`** (yeni): karşılaştırmadan önce (a) rakam-arası
+  `.`/`,` kaldırılır (`155.737`/`155,737` → `155737`), (b) tüm boşluk/tab/satır sonu tek
+  boşluğa iner. Hem alıntı parçası hem kaynak metin bundan geçer; `kaynak_metin` bir kez
+  normalize edilir (`ground_riskler` başında). "..." bölme mantığı korunuyor.
+- Birim test: virgül-ayraçlı alıntı + çok satırlı tablo alıntısı artık doğrulanıyor;
+  "..." eski davranışı + uydurma-parça yakalama bozulmadı.
+
+### Ek — CLI'da aşama aşama ilerleme çıktısı (zenginleştirildi)
+
+- **`pipeline/ilerleme.py`** (yeni, saf sunum): `FAZ_ETIKETLERI` (tabs.py'den taşındı) +
+  `asama_ozeti` (durumsuz, Streamlit checklist) + `model_rolleri_satiri` +
+  `ilerleme_takipcisi(yaz, map_modelleri)` — grup sayısı/model listesini biriktirip
+  çok satırlı, açıklamalı CLI logu üreten geri-çağırım fabrikası.
+- **`pipeline/batch.py`**: `calistir_batch(..., yaz=<satır yazıcı>)`. Verilince her BDR
+  için künye (dosya · karakter · **hangi rol hangi model**) + `graph.stream(
+  stream_mode=["updates","values"])` ile aşama aşama log:
+  ```
+  ▶ 2 · Triyaj  (hangi bölümler kredi riski taşıyor?)
+       49 bölüm tarandı → 29 analize alındı, 20 elendi
+       23 bölüm kural (anahtar kelime) · 6 bölüm LLM (gpt-oss-120b) · 0 boilerplate
+  ▶ 3 · Ensemble Map çıkarımı  —  3 grup × 1 model = 3 paralel çıkarım
+       ✓ grup 1/3 · gpt-oss-120b → 2 ham risk (1.9s)
+       ✓ grup 2/3 · gpt-oss-120b → 5 ham risk (2.6s)
+       ✓ grup 3/3 · gpt-oss-120b → 8 ham risk (4.7s)
+       = toplam 15 ham risk çıkarıldı
+  ```
+  `yaz` verilmezse eski `graph.invoke` yolu (davranış değişmez).
+- **`run_poc.py --batch`**: `yaz=lambda s: print(s, flush=True)`.
+- **`ui/tabs.py`**: aynı `ilerleme_takipcisi` Streamlit'te de — checklist'in altında
+  `st.code` ile canlı, açıklamalı akış logu + künyede model rolleri satırı.
+
+### Doğrulama
+
+Offline: `py_compile` (tüm dokunulan dosyalar) + tam pipeline import + birim kontrolleri
+geçti — kategori normalizasyonu (1C dahil), `rollup_ele` (5→4), `_kategori_kurtar`,
+fuzzy dedup, grounding "…" farkındalığı. Mock batch koşumu zengin ilerleme çıktısını
+doğruladı.
+
+6.-7. tur: "Diğer" 0, kategoriler doğru. **7. turda roll-up kalemi TEKRAR çıktı** (3.
+kez) → `rollup_ele` sayı-bazlı kapsamaya güçlendirildi + `check_rollup.py` eklendi.
+SORUN 2D (critic şişmesi) açık, kullanıcı öncelik vermedi.
+
+⚠️ **Streamlit'ten koşuyorsan:** dosya değişikliği sonrası Python modülleri önbelleğe
+alındığı için **sunucuyu yeniden başlat** (Ctrl+C → tekrar `streamlit run`), yoksa
+`rollup_ele` gibi yeni kod devreye girmez.
+
+8. tur bekliyor: güçlendirilmiş `rollup_ele` roll-up'ı gerçekten eliyor mu (2-3 kez),
+3B format-kurbanları doğrulanıyor mu.
+
+**Bilinen limit:** `partial_ratio@85` uzun cümlede tek rakam-grubu değişimini (ör.
+`513.245`→`999.111`) yakalamıyor — deterministik sayı-çıkarımlı kontrol (Faz 11.5).
+
+---
+
 ## 2026-09-03 — İlk TAM TEMİZ gerçek pipeline koşumu (6. deneme)
 
 **Konfig (Gemini'siz "ekonomi"):** `map=gpt-oss-120b`, `triage/reconciler/critic/

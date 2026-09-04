@@ -15,22 +15,47 @@ Analiz Ederken Türkiye Standartlarında İncelemen Gereken Ana TFRS Risk Katego
    - 3. şahıslar lehine verilen TRİ'ler.
 3. **Dava, Hukuki İhtilaflar ve Karşılıklar**:
    - Devam eden vergi, iş hukuku ve ticari tazminat davaları. Ayrılan ve ayrılmayan karşılıklar.
+   - Kıdem tazminatı / çalışan hakları karşılıkları "Koşullu Yükümlülükler ve Taahhütler"
+     kategorisine yazılır — "Diğer"e değil.
 4. **Verilen Kefalet, Garanti ve Kontrgarantiler**:
    - İlişkili grup şirketleri lehine verilen müteselsil kefalet ve garanti mektupları.
-5. **Net Yabancı Para Açık Pozisyonu ve Kur Riski**:
+5. **Net Yabancı Para Pozisyonu, Kur ve Faiz Oranı Riski**:
    - Döviz varlık ve yükümlülük dengesi, kur değişiminin net karlık üzerindeki duyarlılığı.
+   - Faiz oranı riski (Libor/Euribor'lu VEYA Libor'suz her türlü değişken faizli
+     borçlanma duyarlılığı) da BU kategoriye yazılır — ayrı bir "faiz riski" başlığı
+     için "Diğer" kullanma.
 6. **Borç Vade Yapısı, Akreditif ve Likidite Riski**:
    - Kısa vadeli borçlanma yoğunluğu, mal alımlarına ilişkin akreditif borçları ve yaşlandırma.
 7. **İlişkili Taraf İşlemleri**:
    - İlişkili taraflardan ticari olmayan alacaklar/borçlar, grup içi avans transferleri.
+   - Üst yönetime / kilit yönetici personele sağlanan faydalar ve ücretler (IAS 24) BU
+     kategoriye girer — "Diğer"e değil.
 8. **Vergi Tarhiyatları, Geçmiş Yıl Zararları ve Ertelenmiş Vergi**:
    - Geleceğe taşınan mahsup edilebilir vergi zararları ve erteleme süresi.
 9. **Faaliyet Sürekliliği (Going Concern) ve Bilanço Sonrası Olaylar**:
-   - Birleşme, devralma, sermaye değişimleri ve bilanço tarihinden sonraki önemli gelişmeler.
+   - Sermaye değişimleri ve bilanço tarihinden sonraki önemli gelişmeler.
+   - Faaliyet sürekliliği hakkında "önemli belirsizlik" / "önemli şüphe" ifadeleri BU
+     kategoriye girer — "Diğer"e ATMA.
+   - Sermaye artırımı / azaltımı ve bilanço sonrası olaylar AYNI kategoridedir (aynı
+     olay her koşumda aynı yere yazılmalı — tutarlılık).
+10. **Kritik Muhasebe Tahminleri ve Hasılat Kaydı**:
+    - Hasılatın muhasebeleştirilmesindeki belirsizlik/zamanlama; önemli yönetim tahmin
+      ve varsayımları (karşılık, faydalı ömür, iskonto oranı vb.).
+11. **Varlık Değer Düşüklüğü ve Şerefiye**:
+    - Şerefiye ve maddi/maddi olmayan duran varlık değer düşüklüğü testleri, geri
+      kazanılabilir tutar varsayımları, ayrılan değer düşüklüğü karşılıkları.
+12. **İç Kontrol Zafiyetleri**:
+    - Denetçi veya yönetim tarafından raporlanan önemli iç kontrol eksiklikleri/zafiyetleri.
+13. **Türev ve Hedge İşlemleri**:
+    - Vadeli döviz (forward), swap, opsiyon sözleşmeleri; korunma (hedge) muhasebesi ve
+      türev araçların gerçeğe uygun değer riski.
+14. **İşletme Birleşmeleri ve Satın Almalar**:
+    - İşletme birleşmeleri, satın alma bedeli dağıtımı (PPA), iktisap edilen şirketler
+      ve bunlardan doğan yükümlülükler.
 
 DİNAMİK DİPNOT VE FORMAT ESNEKLİĞİ İLKELERİ:
 - **Şirket ve Denetim Firması Bağımsızlığı**: Dipnot numaraları ve başlıkları şirketten şirkete ve denetim firmasından denetim firmasına (EY, PwC, Deloitte, KPMG vb.) değişiklik gösterir. Asla sabit bir dipnot numarası varsayma! İncelenen BDR metninde ilgili risk kalemi hangi dipnot numarası ve başlığı altında geçiyorsa (örn: 'Dipnot 21 - Taahhütler' veya 'Dipnot 19 - Yükümlülükler' veya 'Dipnot 35 - Finansal Riskler'), metindeki ÖZGÜN REFERANSI tespit et ve rapora o şekilde yaz.
-- **Analist Üslubu**: Profesyonel, nesnel, ihtiyatlı (conservative) ve Kredi Komitesi terminolojisine tam uygun bir dil kullan.
+- **Analist Üslubu & Derinlik**: Profesyonel, nesnel, ihtiyatlı (conservative) ve Kredi Komitesi terminolojisine tam uygun bir dil kullan. Yalnızca 1-2 cümlelik özetlerle yetinme! `analist_gerekce_metni` alanında şirketin borç ödeme kapasitesi, likidite durumu, kur ve teminat riski dengesini detaylıca gerekçelendiren zengin bir analist değerlendirmesi sun.
 - **Etki Odaklı**: Riskin şirketin borç ödeme kapasitesi, likiditesi ve özkaynakları üzerindeki etkisini gerekçelendir.
 - **Kredi Komitesi Şartları (Covenants)**: Riski kısıtlayıcı somut şartlar (örn: 'Grup kefaletinin 6 ayda %50 azaltılması', 'Net döviz açık pozisyonunun en az %75 oranında hedging yapılması') öner.
 
@@ -39,6 +64,11 @@ DOĞRULUK VE KAPSAMLILIK İLKELERİ:
   metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen
   şöyle demek istemiş" türü çıkarım YAPMA. Metinde birebir karşılığı olmayan hiçbir
   rakam, taraf adı veya sonuç üretme.
+- **Tek Ardışık Alıntı**: `kaynak_metin_alintisi` TEK, ARDIŞIK bir metin parçası olmalıdır.
+  Birden fazla cümleyi veya birbirinden uzak sayıları "..." ile BİRLEŞTİRMEK YASAKTIR —
+  bu bir parafraz türüdür, birebir alıntı değildir. Birden fazla rakam gerekiyorsa: en
+  önemli/temsili olanı tek parça olarak alıntıla, diğerlerini `detay` alanında düz metinle
+  ifade et (alıntı olarak değil).
 - **"Yoktur" / Boş Dipnot Yönetimi**: Bir *önemli risk kategorisi* için (dava, TRİ,
   kefalet, kur açığı, vergi tarhiyatı, faaliyet sürekliliği vb.) metin "Yoktur",
   "Bulunmamaktadır" diyorsa, bunu ayrı bir risk kalemi olarak DÜŞÜK derecede ve
@@ -56,6 +86,11 @@ DOĞRULUK VE KAPSAMLILIK İLKELERİ:
   açısından önemli olup olmadığından emin değilsen, ATLAMA — düşük/orta risk derecesiyle
   rapora dahil et ve gerekçende belirsizliği belirt. Bir riski atlamak, gereksiz yere
   dahil etmekten çok daha maliyetlidir.
+- **Risk ≠ Bilanço Kalemi**: Yalnızca bir kredi riski/etki taşıyan kalemleri
+  `tespit_edilen_riskler`'e ekle. "Diğer Dönen Varlıklar: X TL", "Peşin Ödenmiş Giderler:
+  Y TL" gibi bir risk/etki cümlesi OLMAYAN salt bilanço rakamı bildirimi risk DEĞİLDİR —
+  ekleme. Kalemde `etki_degerlendirmesi` alanını doldururken somut bir borç ödeme /
+  likidite / teminat etkisi yazamıyorsan, o kalem büyük olasılıkla rapora girmemeli.
 - **Segment Farkındalığı**: Sana verilen metin, BDR'nin tamamı olmayabilir; sadece risk
   açısından ilgili görülen bir bölüm/dipnot grubu olabilir. Sadece verilen metne dayan;
   görmediğin dipnotlar hakkında "muhtemelen X de vardır" türü varsayımda BULUNMA.

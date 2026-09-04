@@ -8,21 +8,15 @@ from finside.writers import ReportWriter
 from finside.report_md import report_to_markdown
 from finside.models import BDRRiskAnalysisReport as _Rapor
 from finside.pipeline.graph import build_graph
+from finside.pipeline.ilerleme import (
+    FAZ_ETIKETLERI,
+    asama_ozeti,
+    ilerleme_takipcisi,
+    model_rolleri_satiri,
+)
 
 
 PROMPT_FILE_NAME = "bdr_analyst_v1.md"
-
-FAZ_ETIKETLERI = {
-    "segmentle": "1 · Segmentasyon",
-    "triyaj_yap": "2 · Triyaj",
-    "gruplari_olustur": "2 · Gruplama",
-    "map_worker": "3 · Ensemble Map çıkarımı",
-    "map_topla": "3 · Map birleştirme",
-    "grup_isle": "4-6 · Grounding + Uzlaştırma + Critic",
-    "sentezle": "7 · Sentez",
-    "qa_kontrol": "8 · Tutarlılık QA",
-    "maliyet_ozetle": "10 · Maliyet özeti",
-}
 
 
 def render_overview_tab(bdr_name: str, is_mock_mode: bool):
@@ -202,18 +196,26 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         }
         pipe_cfg_run = {"configurable": {"thread_id": bdr_name}, "recursion_limit": 150}
 
+        st.caption(f"Modeller — {model_rolleri_satiri(secili_ensemble)}")
         durum_alani = st.empty()
+        log_alani = st.empty()
         yapilan = set()
         son_guncelleme = {}
+        log_satirlari: List[str] = []
+        takipci = ilerleme_takipcisi(log_satirlari.append, secili_ensemble)
         with st.spinner("🔗 Pipeline çalışıyor…"):
             for adim in pipe_graph.stream(pipe_baslangic, config=pipe_cfg_run, stream_mode="updates"):
                 for node, guncelleme in adim.items():
                     yapilan.add(node)
                     if guncelleme:
                         son_guncelleme[node] = guncelleme
+                    takipci(node, guncelleme or {})
                 with durum_alani.container():
                     for node, etiket in FAZ_ETIKETLERI.items():
-                        st.write(("✅ " if node in yapilan else "⏳ ") + etiket)
+                        ozet = asama_ozeti(node, son_guncelleme.get(node, {}))
+                        isaret = "✅ " if node in yapilan else "⏳ "
+                        st.write(isaret + etiket + (f" — {ozet}" if ozet and node in yapilan else ""))
+                log_alani.code("\n".join(log_satirlari), language="text")
 
         nihai = (son_guncelleme.get("maliyet_ozetle") or {}).get("nihai_rapor") \
             or (son_guncelleme.get("qa_kontrol") or {}).get("nihai_rapor")
