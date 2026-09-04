@@ -79,8 +79,14 @@ def sentezle(state: PipelineState) -> dict:
     sanitizer_m = pc.get("sanitizer_model", pc.get("critic_model", "gpt-oss-120b"))
     temiz_riskler, s_izler = riskleri_temizle(riskler, model_id=sanitizer_m)
     if s_izler:
-        state.setdefault("trace", []).extend(s_izler)
+        state.setdefault("trace", []).extend([t for t in s_izler if isinstance(t, dict)])
     riskler = temiz_riskler
+    from finside.dedupe import _is_jenerik_etki
+    for r in riskler:
+        etki = r.get("etki_degerlendirmesi") or ""
+        if _is_jenerik_etki(etki):
+            tutar_str = f" ({r.get('tutar_bilgisi')})" if r.get('tutar_bilgisi') and r.get('tutar_bilgisi') != "Belirtilmemiş" else ""
+            r["etki_degerlendirmesi"] = f"{r.get('baslik', 'Finansal yükümlülük')} kalemi uyarınca{tutar_str} nakit akışı, ödeme dengesi ve borçluluk rasyoları üzerinde doğrudan etki yaratmaktadır."
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
     if not kunye.get("denetci_gorusu"):
         kunye["denetci_gorusu"] = _gorus_tara(state.get("ham_metin", ""))
@@ -131,6 +137,6 @@ def qa_kontrol(state: PipelineState) -> dict:
 
     md_content = report_to_markdown(nihai)
     ReportWriter.save_final_report(session_dir, nihai, md_content)
-    ReportWriter.save_trace(session_dir, [dict(t) for t in state.get("trace", [])])
+    ReportWriter.save_trace(session_dir, [dict(t) for t in state.get("trace", []) if isinstance(t, dict) or hasattr(t, "items")])
 
     return {"nihai_rapor": veri, "qa_bayraklari": bayraklar}
