@@ -18,6 +18,11 @@ Görevin: bu risklere dayanarak Kredi Komitesi Raporu'nun ÜST DÜZEY alanların
 `tespit_edilen_riskler` alanını BOŞ LİSTE (`[]`) olarak bırak — risk listesi ayrıca
 sistem tarafından eklenecek, senin tekrar yazman gerekmiyor (çıktıyı kısa tutar).
 
+Verilen listede bir kalem, BİRDEN FAZLA başka kalemin rakamlarını bir araya toplayan
+bir özet/roll-up olabilir (yeni bilgi eklemez, var olanları tekrar toplar). Bu tür bir
+konsolidasyonu `genel_kredi_risk_ozeti` içinde düz metinle ifade et; onu ayrı bir risk
+gibi tekrar sayma ve tutarları çift saymamaya dikkat et.
+
 ## USER_PROMPT
 Firma künyesi:
 {kunye_json}

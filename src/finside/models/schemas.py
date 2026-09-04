@@ -3,6 +3,14 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 
+# Python'da "İ".lower() araya U+0307 (combining dot above) bırakır — bu, plain-i
+# içeren anahtar kelimelerin büyük-İ ile başlayan girdilere karşı eşleşmesini bozar.
+_COMBINING_DOT = chr(0x0307)
+
+
+def sadelestir_tr(text: str) -> str:
+    return text.strip().lower().replace(_COMBINING_DOT, "")
+
 
 @dataclass
 class BenchmarkRequest:
@@ -34,11 +42,16 @@ class RiskKategorisi(str, Enum):
     REHIN_IPOTEK_TRI = "Teminat, Rehin, İpotek (TRİ) ve Varlık Kısıtlamaları"
     KEFALET_TEMINAT = "Verilen Kefalet, Garanti ve Teminatlar"
     KOSULLU_YUKUMLULUK = "Koşullu Yükümlülükler ve Taahhütler"
-    KUR_VE_DOVIZ_RISKI = "Net Yabancı Para Pozisyonu ve Kur Riski"
+    KUR_VE_DOVIZ_RISKI = "Net Yabancı Para Pozisyonu, Kur ve Faiz Oranı Riski"
     LIKIDITE_VE_BORCLANMA = "Borç Vade Yapısı, Akreditif ve Likidite Riski"
     ILISKILI_TARAF = "İlişkili Taraf İşlemleri ve Bakiyeleri"
     MEVZUAT_VERGI = "Vergi Tarhiyatları, Geçmiş Yıl Zararları ve Mevzuat Riskleri"
     FAALIYET_SUREKLILIGI_VE_SONRAKI_OLAYLAR = "Faaliyet Sürekliliği ve Bilanço Sonrası Olaylar"
+    VARLIK_DEGER_DUSUKLUGU_VE_SEREFIYE = "Varlık Değer Düşüklüğü ve Şerefiye"
+    MUHASEBE_TAHMINI_VE_HASILAT = "Kritik Muhasebe Tahminleri ve Hasılat Kaydı"
+    IC_KONTROL_ZAFIYETI = "İç Kontrol Zafiyetleri"
+    TUREV_VE_HEDGE_ISLEMLERI = "Türev ve Hedge İşlemleri"
+    ISLETME_BIRLESMESI = "İşletme Birleşmeleri ve Satın Almalar"
     DIGER_KALITATIF_RISK = "Diğer Kalitatif Risk Unsuarları"
 
 
@@ -83,12 +96,29 @@ class BDRRiskItem(BaseModel):
     @classmethod
     def normalize_risk_kategorisi(cls, v: Any) -> str:
         if isinstance(v, str):
-            v_clean = v.strip().lower()
+            # Python'da "İ".lower() araya U+0307 combining nokta bırakır; bu, "ilişkili"
+            # gibi i-başlı anahtar kelimelerin büyük-İ girdilerine karşı eşleşmesini
+            # bozar. Her iki tarafı da bu noktadan arındır.
+            v_clean = sadelestir_tr(v)
             for cat in RiskKategorisi:
-                if cat.value.lower() in v_clean or v_clean in cat.value.lower():
+                cat_clean = sadelestir_tr(cat.value)
+                if cat_clean in v_clean or v_clean in cat_clean:
                     return cat.value
 
-            if "faaliyet" in v_clean or "süreklilik" in v_clean or "sonraki" in v_clean or "bilanço" in v_clean:
+            if "iç kontrol" in v_clean or "ic kontrol" in v_clean or "kontrol zafiyet" in v_clean or "kontrol eksikli" in v_clean:
+                return RiskKategorisi.IC_KONTROL_ZAFIYETI.value
+            if "şerefiye" in v_clean or "serefiye" in v_clean or "değer düşüklüğü" in v_clean or "deger dusuklugu" in v_clean:
+                return RiskKategorisi.VARLIK_DEGER_DUSUKLUGU_VE_SEREFIYE.value
+            if "türev" in v_clean or "turev" in v_clean or "forward" in v_clean or "hedge" in v_clean or "swap" in v_clean or "korunma muhasebesi" in v_clean:
+                return RiskKategorisi.TUREV_VE_HEDGE_ISLEMLERI.value
+            if "birleşme" in v_clean or "birlesme" in v_clean or "satın alma" in v_clean or "satin alma" in v_clean or "iktisap" in v_clean or "devralma" in v_clean:
+                return RiskKategorisi.ISLETME_BIRLESMESI.value
+            if "hasılat" in v_clean or "hasilat" in v_clean or "muhasebe tahmini" in v_clean or "kritik tahmin" in v_clean or "önemli tahmin" in v_clean:
+                return RiskKategorisi.MUHASEBE_TAHMINI_VE_HASILAT.value
+            if (
+                "faaliyet" in v_clean or "süreklilik" in v_clean or "sonraki" in v_clean
+                or "bilanço" in v_clean or "sermaye artır" in v_clean or "sermaye artış" in v_clean
+            ):
                 return RiskKategorisi.FAALIYET_SUREKLILIGI_VE_SONRAKI_OLAYLAR.value
             if "kefalet" in v_clean or "garanti" in v_clean:
                 return RiskKategorisi.KEFALET_TEMINAT.value
@@ -96,7 +126,16 @@ class BDRRiskItem(BaseModel):
                 return RiskKategorisi.DAVA.value
             if "tri" in v_clean or "ipotek" in v_clean or "rehin" in v_clean:
                 return RiskKategorisi.REHIN_IPOTEK_TRI.value
-            if "döviz" in v_clean or "kur" in v_clean or "yabancı para" in v_clean:
+            if (
+                "üst yönetim" in v_clean or "üst düzey yönetici" in v_clean
+                or "kilit yönetici" in v_clean or "yönetim kurulu ücret" in v_clean
+                or "yönetim kuruluna sağlanan" in v_clean
+            ):
+                return RiskKategorisi.ILISKILI_TARAF.value
+            if (
+                "döviz" in v_clean or "kur" in v_clean or "yabancı para" in v_clean
+                or "libor" in v_clean or "faiz oran" in v_clean or "faiz riski" in v_clean
+            ):
                 return RiskKategorisi.KUR_VE_DOVIZ_RISKI.value
             if "vergi" in v_clean or "tarhiyat" in v_clean:
                 return RiskKategorisi.MEVZUAT_VERGI.value
@@ -106,7 +145,11 @@ class BDRRiskItem(BaseModel):
                 return RiskKategorisi.LIKIDITE_VE_BORCLANMA.value
             if "denetçi" in v_clean or "görüş" in v_clean or "kam" in v_clean or "kilit" in v_clean:
                 return RiskKategorisi.DENETCI_GORUSU_VE_KAM.value
-            if "koşullu" in v_clean or "taahhüt" in v_clean:
+            if (
+                "koşullu" in v_clean or "taahhüt" in v_clean or "kıdem tazminat" in v_clean
+                or "kidem tazminat" in v_clean or "çalışan hakları" in v_clean
+                or "emeklilik yükümlülü" in v_clean
+            ):
                 return RiskKategorisi.KOSULLU_YUKUMLULUK.value
             return RiskKategorisi.DIGER_KALITATIF_RISK.value
         return v

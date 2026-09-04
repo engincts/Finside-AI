@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import List
 
 from config import Config
-from finside.dedupe import dedup_risk_dicts
+from finside.dedupe import dedup_risk_dicts, rollup_ele
 from finside.loaders.prompt_loader import PromptLoader
 from finside.pipeline.few_shot import ilgili_ornekler
+from finside.pipeline.keyword_map import kategori_eslesmesi
 from finside.pipeline.llm_call import rapor_cagrisi
 from finside.pipeline.nodes.map_extract import map_modelleri
 from finside.pipeline.qa_rules import qa_bayraklari
@@ -18,6 +19,20 @@ from finside.models import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
 _KUNYE_ALANLARI = ("firma_adi", "rapor_donemi", "denetim_firmasi", "denetci_gorusu")
 _GORUS_TARAMA_KARAKTER = 12000  # "Görüş" bölümü BDR'nin başındadır
 _EMBED_ANAHTAR_ENV = "OPENAI_API_KEY"
+_DIGER_KATEGORI = "Diğer Kalitatif Risk Unsuarları"
+
+
+def _kategori_kurtar(riskler: List[dict]) -> List[dict]:
+    """Strict-şema model 'Diğer'i doğrudan seçince `normalize_risk_kategorisi`
+    baypas oluyor; başlık/detaydan anahtar kelime ile kategoriyi kurtarmayı dene."""
+    kurtarilmis: List[dict] = []
+    for risk in riskler:
+        if risk.get("risk_kategorisi") == _DIGER_KATEGORI:
+            eslesme = kategori_eslesmesi(f"{risk.get('baslik', '')} {risk.get('detay', '')}")
+            if eslesme is not None and eslesme.value != _DIGER_KATEGORI:
+                risk = {**risk, "risk_kategorisi": eslesme.value}
+        kurtarilmis.append(risk)
+    return kurtarilmis
 # Şema varsayılanları oy çoğunluğuna karışmasın (bkz. schemas.py alan varsayılanları)
 _SEMA_VARSAYILANLARI = {"Belirtilmemiş Şirket", "Belirtilmemiş Dönem"}
 
@@ -57,6 +72,7 @@ def sentezle(state: PipelineState) -> dict:
     pc = Config.get_pipeline_config()
     ham_riskler = list(state.get("uzlastirilmis_riskler", []))
     riskler = dedup_risk_dicts(ham_riskler, api_key=os.getenv(_EMBED_ANAHTAR_ENV))
+    riskler = _kategori_kurtar(rollup_ele(riskler))
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
     if not kunye.get("denetci_gorusu"):
         kunye["denetci_gorusu"] = _gorus_tara(state.get("ham_metin", ""))
@@ -103,7 +119,10 @@ def qa_kontrol(state: PipelineState) -> dict:
     veri = nihai.model_dump(mode="json")
 
     session_dir = Path(state["session_dir"])
-    ReportWriter.save_json(session_dir, "nihai_rapor.json", veri)
+    from finside.report_md import report_to_markdown
+
+    md_content = report_to_markdown(nihai)
+    ReportWriter.save_final_report(session_dir, nihai, md_content)
     ReportWriter.save_trace(session_dir, [dict(t) for t in state.get("trace", [])])
 
     return {"nihai_rapor": veri, "qa_bayraklari": bayraklar}

@@ -1,12 +1,13 @@
 """Faz 5 — Uzlaştırma: birden çok modelin risk listelerini tek listeye indirger.
 
-Önce mekanik ön-birleştirme (başlık kümeleme + en ihtiyatlı derece), sonra bir
+Önce mekanik ön-birleştirme (fuzzy başlık kümeleme + en ihtiyatlı derece), sonra bir
 Reconciler LLM çağrısı. LLM'in düşürdüğü kalemler recall için geri eklenir.
 """
 
 import json
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
+from finside.dedupe import ayni_baslik_index
 from finside.loaders.prompt_loader import PromptLoader
 from finside.pipeline.llm_call import rapor_cagrisi
 from finside.pipeline.state import TraceKaydi
@@ -14,23 +15,25 @@ from finside.pipeline.state import TraceKaydi
 RISK_DERECE_SIRA = {"Düşük": 0, "Orta": 1, "Yüksek": 2, "Kritik": 3}
 
 
-def _anahtar(risk: dict) -> str:
+def _baslik(risk: dict) -> str:
     return (risk.get("baslik") or "").strip().lower()
 
 
 def mekanik_birlestir(riskler: List[dict]) -> Tuple[List[dict], List[dict]]:
-    kumeler: Dict[str, dict] = {}
+    kumeler: List[dict] = []
     celiskiler: List[dict] = []
 
     for risk in riskler:
-        anahtar = _anahtar(risk)
-        if not anahtar:
-            continue
-        if anahtar not in kumeler:
-            kumeler[anahtar] = {**risk, "kaynak_modeller": list(risk.get("kaynak_modeller", []))}
+        baslik = _baslik(risk)
+        if not baslik:
             continue
 
-        mevcut = kumeler[anahtar]
+        idx = ayni_baslik_index(baslik, [_baslik(k) for k in kumeler])
+        if idx is None:
+            kumeler.append({**risk, "kaynak_modeller": list(risk.get("kaynak_modeller", []))})
+            continue
+
+        mevcut = kumeler[idx]
         mevcut["kaynak_modeller"] = sorted(
             set(mevcut["kaynak_modeller"]) | set(risk.get("kaynak_modeller", []))
         )
@@ -45,7 +48,7 @@ def mekanik_birlestir(riskler: List[dict]) -> Tuple[List[dict], List[dict]]:
         if len(str(risk.get("detay") or "")) > len(str(mevcut.get("detay") or "")):
             mevcut["detay"] = risk["detay"]
 
-    return list(kumeler.values()), celiskiler
+    return kumeler, celiskiler
 
 
 def uzlastir(
@@ -68,14 +71,15 @@ def uzlastir(
         return on_birlesik, celiskiler, [sonuc.trace]
 
     # kaynak_modeller izlenebilirlik alanıdır — LLM'in üretebileceği bir değer değil,
-    # her zaman mekanik eşleşmeden (başlık) deterministik olarak atanır.
-    kaynak_haritasi = {_anahtar(r): r.get("kaynak_modeller", []) for r in on_birlesik}
+    # her zaman mekanik eşleşmeden (fuzzy başlık) deterministik olarak atanır.
+    on_birlesik_basliklar = [_baslik(r) for r in on_birlesik]
     llm_riskler = []
     for risk in sonuc.report.tespit_edilen_riskler:
         veri = risk.model_dump(mode="json")
-        veri["kaynak_modeller"] = kaynak_haritasi.get(_anahtar(veri), [])
+        idx = ayni_baslik_index(_baslik(veri), on_birlesik_basliklar)
+        veri["kaynak_modeller"] = on_birlesik[idx].get("kaynak_modeller", []) if idx is not None else []
         llm_riskler.append(veri)
 
-    llm_basliklar = {_anahtar(r) for r in llm_riskler}
-    geri_eklenen = [r for r in on_birlesik if _anahtar(r) not in llm_basliklar]
+    llm_basliklar = [_baslik(r) for r in llm_riskler]
+    geri_eklenen = [r for r in on_birlesik if ayni_baslik_index(_baslik(r), llm_basliklar) is None]
     return llm_riskler + geri_eklenen, celiskiler, [sonuc.trace]

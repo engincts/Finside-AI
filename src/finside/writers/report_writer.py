@@ -27,6 +27,15 @@ class ReportWriter:
 
         md_file.write_text(markdown_content, encoding="utf-8")
         json_file.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        cls.save_final_report(session_dir, report, markdown_content)
+
+    @classmethod
+    def save_final_report(cls, session_dir: Path, report: BDRRiskAnalysisReport, markdown_content: str):
+        """Uçtan uca üretilen TEK NİHAİ RAPOR dosyalarını (final_report.md & nihai_rapor.md) kaydeder."""
+        (session_dir / "final_report.md").write_text(markdown_content, encoding="utf-8")
+        (session_dir / "final_report.json").write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        (session_dir / "nihai_rapor.md").write_text(markdown_content, encoding="utf-8")
+        (session_dir / "nihai_rapor.json").write_text(report.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
     def save_json(cls, session_dir: Path, dosya_adi: str, veri: Any):

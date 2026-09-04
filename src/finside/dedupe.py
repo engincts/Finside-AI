@@ -1,5 +1,8 @@
 import math
+import re
 from typing import List, Optional
+
+from rapidfuzz import fuzz
 
 from config import Config
 from finside.models import BDRRiskItem
@@ -7,6 +10,80 @@ from finside.models import BDRRiskItem
 
 def _norm(text: str) -> str:
     return text.strip().lower()
+
+
+_SAYI_RE = re.compile(r"\d[\d.,]*\d")
+_YIL_ARALIGI = range(1990, 2100)
+
+
+def _onemli_sayilar(*metinler: str) -> set:
+    """Metindeki 4+ haneli tutar benzeri sayılar (yıl olmayan). Binlik/ondalık
+    ayıraçları temizlenir: '116.737' ve '116737' aynı sayılır."""
+    bulunan: set = set()
+    for metin in metinler:
+        for eslesme in _SAYI_RE.findall(metin or ""):
+            rakamlar = eslesme.replace(".", "").replace(",", "")
+            if len(rakamlar) >= 4 and int(rakamlar) not in _YIL_ARALIGI:
+                bulunan.add(rakamlar)
+    return bulunan
+
+
+def _kalem_sayilari(risk: dict) -> set:
+    return _onemli_sayilar(
+        risk.get("tutar_bilgisi") or "", risk.get("detay") or "", risk.get("baslik") or ""
+    )
+
+
+def rollup_ele(riskler: List[dict]) -> List[dict]:
+    """"Roll-up/özet kalemi"ni eler: bir kalemin HER somut sayısı, aynı kategorideki
+    başka ≥2 kalemde de geçiyorsa (yani kalem yeni/kendine özgü hiçbir tutar
+    getirmiyor, var olan ≥2 kalemi bir araya topluyor) → çıkar.
+
+    Deterministik (regex sayı eşleştirme, LLM yok). Prompt-seviyesi yasak bu deseni
+    3 koşumda bastıramadığı için eklendi (bkz. CHANGELOG SORUN 2C).
+    `alt <= aday` yerine sayı-bazlı kapsama: tekil kalemler ham tablo satırından
+    fazladan sayı taşısa bile roll-up yakalanır.
+    """
+    if len(riskler) < 3:
+        return list(riskler)
+
+    sayilar = [_kalem_sayilari(r) for r in riskler]
+    elenecek: set = set()
+    for i, aday in enumerate(sayilar):
+        if len(aday) < 2 or i in elenecek:
+            continue
+        kat = riskler[i].get("risk_kategorisi")
+        kapsayan_kalemler: set = set()
+        her_sayi_baskada_var = True
+        for sayi in aday:
+            baskalari = {
+                j for j, alt in enumerate(sayilar)
+                if j != i and j not in elenecek and sayi in alt
+                and riskler[j].get("risk_kategorisi") == kat
+            }
+            if not baskalari:
+                her_sayi_baskada_var = False
+                break
+            kapsayan_kalemler |= baskalari
+        if her_sayi_baskada_var and len(kapsayan_kalemler) >= 2:
+            elenecek.add(i)
+
+    return [r for i, r in enumerate(riskler) if i not in elenecek]
+
+
+def ayni_baslik_index(baslik: str, adaylar: List[str]) -> Optional[int]:
+    """`baslik`'e `Config.BASLIK_BENZERLIK_ESIGI` üstünde benzeyen ilk adayın indeksi.
+
+    `token_sort_ratio` kelime sırasından bağımsızdır; Türkçe çoğul eki (-lar/-ler) ve
+    birim yazım farkı ("116.737 TL" vs "116.737 bin TL") gibi yüzeysel farkları aynı
+    kaleme indirir, "alacaklar" vs "borçlar" gibi karşıt kalemleri ayrı tutar.
+    """
+    if not baslik:
+        return None
+    for i, aday in enumerate(adaylar):
+        if aday and fuzz.token_sort_ratio(baslik, aday) >= Config.BASLIK_BENZERLIK_ESIGI:
+            return i
+    return None
 
 
 def _risk_signature(risk: BDRRiskItem) -> str:
@@ -23,22 +100,21 @@ def dedup_risk_dicts(riskler: List[dict], api_key: Optional[str] = None) -> List
     Birleştirilen kalemlerin `kaynak_modeller` listeleri birleşir; hiçbir kalem içerik
     kaybı yaşamaz (en zengin detay tutulur).
     """
-    basliga_gore: dict = {}
+    kalanlar: List[dict] = []
     for risk in riskler:
         anahtar = _norm(risk.get("baslik") or "")
         if not anahtar:
             continue
-        if anahtar not in basliga_gore:
-            basliga_gore[anahtar] = {**risk, "kaynak_modeller": list(risk.get("kaynak_modeller", []))}
+        idx = ayni_baslik_index(anahtar, [_norm(k.get("baslik") or "") for k in kalanlar])
+        if idx is None:
+            kalanlar.append({**risk, "kaynak_modeller": list(risk.get("kaynak_modeller", []))})
         else:
-            mevcut = basliga_gore[anahtar]
+            mevcut = kalanlar[idx]
             mevcut["kaynak_modeller"] = sorted(
                 set(mevcut["kaynak_modeller"]) | set(risk.get("kaynak_modeller", []))
             )
             if len(str(risk.get("detay") or "")) > len(str(mevcut.get("detay") or "")):
                 mevcut["detay"] = risk["detay"]
-
-    kalanlar = list(basliga_gore.values())
     if len(kalanlar) < 2 or not api_key:
         return kalanlar
 
