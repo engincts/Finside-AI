@@ -24,10 +24,9 @@ def report_to_markdown(
         "",
     ]
 
-    # Executive Alert Card & Decision Banner
+    # Executive Card & Decision Banner
     karar_str = report.karar_egilimi.value if report.karar_egilimi else "Belirsiz"
     lines += [
-        "> [!IMPORTANT]",
         f"> ### 🎯 KREDİ KOMİTESİ KARAR EĞİLİMİ: **`{karar_str}`**",
         f"> **Firma Unvanı:** **{report.firma_adi}** | **Rapor Dönemi:** `{report.rapor_donemi}`",
         f"> **Bağımsız Denetçi Görüşü:** `{report.denetci_gorusu.value if report.denetci_gorusu else 'Olumlu Görüş'}` ({report.denetim_firmasi or 'EY / Bağımsız Denetim'})",
@@ -36,8 +35,7 @@ def report_to_markdown(
 
     if report.is_mock_fallback:
         lines += [
-            "> [!WARNING]",
-            "> **MOCK FALLBACK UYARISI**: Bu rapor simülasyon veya API yedekleme moduyla üretilmiştir.",
+            "> ⚠️ **MOCK FALLBACK UYARISI**: Bu rapor simülasyon veya API yedekleme moduyla üretilmiştir.",
             f"> **Neden:** `{report.fallback_reason or 'API çağrı hatası'}`",
             "",
         ]
@@ -57,8 +55,7 @@ def report_to_markdown(
 
     if report.qa_bayraklari:
         lines += [
-            "> [!CAUTION]",
-            "> **Tutarlılık & QA Uyarıları:**",
+            "> 🚩 **Tutarlılık & QA Uyarıları:**",
         ]
         for b in report.qa_bayraklari:
             lines.append(f"> - ⚠️ {b}")
@@ -158,8 +155,7 @@ def report_to_markdown(
     # 5. Kredi Komitesi Aksiyon Şartları (Covenants)
     lines += [
         "## 📋 5. Kredi Komitesi İçin Aksiyon & Kısıtlayıcı Şart Önerileri (Covenants)",
-        "> [!TIP]",
-        "> Kredinin onaylanması durumunda sözleşmeye dâhil edilmesi önerilen finansal taahhüt ve kısıtlayıcı şartlar:",
+        "> 💡 **Kredinin onaylanması durumunda sözleşmeye dâhil edilmesi önerilen finansal taahhüt ve kısıtlayıcı şartlar:**",
         "",
     ]
     if report.komite_tavsiyesi_ve_sartlar:
@@ -177,20 +173,30 @@ def report_to_markdown(
     ]
 
     # Ek: Sistem & Pipeline Metrikleri (Sayfanın En Altında Temiz Dipnot)
+    from config import Config
+    pipe_cfg = Config.get_pipeline_config()
     sure_val = report.analiz_suresi_saniye
     sure_str = f"{sure_val:.2f} saniye" if isinstance(sure_val, (int, float)) and sure_val > 0 else "Tamamlandı"
 
+    map_modelleri = ", ".join(pipe_cfg.get("map_models", [])) if pipe_cfg.get("map_models") else report.kullanilan_model or "Belirtilmemiş"
+
     lines += [
         "---",
-        "### ⚙️ Rapor Üretim & Sistem Telemetrisi",
-        f"- **Analiz Modeli / Motor:** `{report.kullanilan_model or 'Multi-Agent Pipeline'}`",
+        "### ⚙️ Rapor Üretim & Sistem Telemetrisi (Debug & Ajan Rol Haritası)",
         f"- **Analiz Süresi:** `{sure_str}`",
+        "- **Aşama & Görevli Model Rol Haritası:**",
+        f"  - 🎯 **Triyaj (Triage) Ajanı:** `{pipe_cfg.get('triage_model', 'gpt-oss-120b')}`",
+        f"  - 🗺️ **Map (Ensemble Taraması):** `{map_modelleri}`",
+        f"  - 🤝 **Uzlaştırma (Reconciler):** `{pipe_cfg.get('reconciler_model', 'gpt-oss-120b')}`",
+        f"  - 🕵️ **Eleştirmen (Critic):** `{pipe_cfg.get('critic_model', 'gpt-oss-120b')}`",
+        f"  - 🧹 **Temizlik (Sanitizer):** `{pipe_cfg.get('sanitizer_model', pipe_cfg.get('critic_model', 'gpt-oss-120b'))}`",
+        f"  - 🧩 **Sentez (Synthesis):** `{pipe_cfg.get('synthesis_model', 'gpt-oss-120b')}`",
     ]
 
     if pipeline_izi:
         lines += [
             f"- **Toplam LLM Çağrısı:** `{pipeline_izi.get('toplam_llm_cagrisi')}` (Başarısız: `{pipeline_izi.get('basarisiz_cagri')}`)",
-            f"- **Aşama Kırılımı:** `{pipeline_izi.get('asama_kirilimi')}`",
+            f"- **Aşama Çağrı Kırılımı:** `{pipeline_izi.get('asama_kirilimi')}`",
             f"- **Tahmini Token Kullanımı:** `{pipeline_izi.get('tahmini_girdi_token')}` girdi / `{pipeline_izi.get('tahmini_cikti_token')}` çıktı",
             f"- **Tahmini İşlem Maliyeti:** `${pipeline_izi.get('tahmini_usd')}`",
         ]

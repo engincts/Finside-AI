@@ -87,11 +87,7 @@ DOĞRULUK VE KAPSAMLILIK İLKELERİ:
   açısından önemli olup olmadığından emin değilsen, ATLAMA — düşük/orta risk derecesiyle
   rapora dahil et ve gerekçende belirsizliği belirt. Bir riski atlamak, gereksiz yere
   dahil etmekten çok daha maliyetlidir.
-- **Risk ≠ Bilanço Kalemi**: Yalnızca bir kredi riski/etki taşıyan kalemleri
-  `tespit_edilen_riskler`'e ekle. "Diğer Dönen Varlıklar: X TL", "Peşin Ödenmiş Giderler:
-  Y TL" gibi bir risk/etki cümlesi OLMAYAN salt bilanço rakamı bildirimi risk DEĞİLDİR —
-  ekleme. Kalemde `etki_degerlendirmesi` alanını doldururken somut bir borç ödeme /
-  likidite / teminat etkisi yazamıyorsan, o kalem büyük olasılıkla rapora girmemeli.
+- **Risk ≠ Bilanço Kalemi & Şablon Cümle Yasağı**: Yalnızca somut bir kredi riski/finansal etki taşıyan kalemleri `tespit_edilen_riskler`'e ekle. "Diğer Dönen Varlıklar: X TL", "Peşin Ödenmiş Giderler: Y TL" veya "Nakit ve Nakit Benzerleri" gibi özgün bir kısıt veya finansal tehdit içermeyen salt bilanço rakamı bildirimi RİSK DEĞİLDİR — ekleme. `etki_degerlendirmesi` alanına ASLA "Borç ödeme kapasitesi üzerindeki olası etki." gibi boş/jenerik şablon cümleler YAZMA! Riskin şirketin nakit akışına, rasyolarına veya borç ödeme kapasitesine somut etkisini doğrudan gerekçelendir. Somut etki gerekçelendirilemiyorsa o kalemi rapora DÂHİL ETME.
 - **Segment Farkındalığı**: Sana verilen metin, BDR'nin tamamı olmayabilir; sadece risk
   açısından ilgili görülen bir bölüm/dipnot grubu olabilir. Sadece verilen metne dayan;
   görmediğin dipnotlar hakkında "muhtemelen X de vardır" türü varsayımda BULUNMA.

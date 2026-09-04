@@ -12,6 +12,7 @@ from finside.pipeline.keyword_map import kategori_eslesmesi
 from finside.pipeline.llm_call import rapor_cagrisi
 from finside.pipeline.nodes.map_extract import map_modelleri
 from finside.pipeline.qa_rules import qa_bayraklari
+from finside.pipeline.sanitizer import riskleri_temizle
 from finside.pipeline.state import PipelineState
 from finside.writers import ReportWriter
 from finside.models import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
@@ -73,6 +74,13 @@ def sentezle(state: PipelineState) -> dict:
     ham_riskler = list(state.get("uzlastirilmis_riskler", []))
     riskler = dedup_risk_dicts(ham_riskler, api_key=os.getenv(_EMBED_ANAHTAR_ENV))
     riskler = _kategori_kurtar(rollup_ele(riskler))
+
+    # Faz 6.5 — Sanitizer Ajanı (Küçük/hızlı LLM filtresi)
+    sanitizer_m = pc.get("sanitizer_model", pc.get("critic_model", "gpt-oss-120b"))
+    temiz_riskler, s_izler = riskleri_temizle(riskler, model_id=sanitizer_m)
+    if s_izler:
+        state.setdefault("trace", []).extend(s_izler)
+    riskler = temiz_riskler
     kunye = _kunye_oyla(state.get("map_ciktilari", []))
     if not kunye.get("denetci_gorusu"):
         kunye["denetci_gorusu"] = _gorus_tara(state.get("ham_metin", ""))

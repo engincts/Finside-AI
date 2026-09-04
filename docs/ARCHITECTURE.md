@@ -14,9 +14,10 @@ flowchart TD
     D --> E["🔍 4. Grounding (Çok Katmanlı Doğrulama)"]
     E --> F["🤝 5. Uzlaştırma (Reconciliation & Dedupe)"]
     F --> G["🕵️ 6. Critic (Eleştirmen Ajan Döngüsü)"]
-    G --> H["🧩 7. Sentez (Synthesis & Rapor Birleştirme)"]
-    H --> I["🛡️ 8. QA Kontrolü (Quality Assurance)"]
-    I --> J["💾 9. Nihai Rapor (final_report.md / .json)"]
+    G --> H["🧹 6.5. Sanitizer (Temizlik Ajanı & Süzgeç)"]
+    H --> I["🧩 7. Sentez (Synthesis & Rapor Birleştirme)"]
+    I --> J["🛡️ 8. QA Kontrolü (Quality Assurance)"]
+    J --> K["💾 9. Nihai Rapor (final_report.md / .json)"]
 ```
 
 ---
@@ -47,6 +48,12 @@ flowchart TD
   2. Critic modeline ham BDR metni, taslak ve ipuçları verilerek eksik taraması yaptırılır.
   3. Critic'in bulduğu yeni maddeler `kaynak_modeller: ["critic"]` etiketiyle rapora eklenir.
   4. Yeni risk bulunduğu sürece `max_critic_turu` (varsayılan: 2 tur) sınırına kadar uzlaştırma döngüsü devam eder.
+
+### 🧹 6.5. Sanitizer (Temizlik Ajanı & Regex Süzgeci)
+* **Amaç:** Jenerik etki cümlelerini ("Borç ödeme kapasitesi üzerindeki olası etki") ve risk mekanizması barındırmayan soyut/yalın bilanço kalemlerini ("Kıdem Tazminatı Yükümlülüğü") ayıklayan çift aşamalı (Regex + Hızlı LLM) filtre katmanıdır.
+* **Nasıl Çalışır?**
+  1. **Python Regex Süzgeci (`jenerik_ve_tekrarlayan_ele`):** Somut finansal büyüklük (% oran, TL tutar, ipotek, rehin vb.) taşımayan yüzeysel jenerik riskleri aynı kategori altındaki spesifik dipnot maddelerinin bünyesine yedirerek tekleştirir.
+  2. **LLM Sanitizer Agent (`riskleri_temizle`):** Hızlı bir model (örn. `faz6.5-sanitizer`) aracılığıyla kalan jenerik etki cümlelerini somut finansal analizlerle günceller veya geçersiz maddeleri eler.
 
 ### 🧩 7. Sentez (Synthesis)
 * **Amaç:** Tüm doğrulanmış riskler, finansal rasyolar ve 3-4 paragraflık kıdemli analist gerekçesi tek bir **Nihai Kredi Komitesi Raporu** halinde birleştirilir.
