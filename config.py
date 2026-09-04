@@ -80,10 +80,27 @@ class Config:
         "auto": 8192,
     }
 
+    _config_data: Optional[Dict[str, Any]] = None
+
     @classmethod
-    def load_config(cls) -> Dict[str, Any]:
-        with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+    def load_config(cls, force_reload: bool = False) -> Dict[str, Any]:
+        if cls._config_data is None or force_reload:
+            with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
+                cls._config_data = json.load(f)
+        return cls._config_data
+
+    @classmethod
+    def update_pipeline_config(cls, reconciler: Optional[str] = None, critic: Optional[str] = None, synthesis: Optional[str] = None) -> None:
+        cfg = cls.load_config()
+        if "pipeline" not in cfg:
+            cfg["pipeline"] = {}
+        if reconciler:
+            cfg["pipeline"]["reconciler_model"] = reconciler
+        if critic:
+            cfg["pipeline"]["critic_model"] = critic
+        if synthesis:
+            cfg["pipeline"]["synthesis_model"] = synthesis
+
 
     @classmethod
     def get_enabled_models(cls) -> List[Dict[str, Any]]:
@@ -135,6 +152,96 @@ class Config:
         return None
 
     @classmethod
+    def model_girdi_siniri(cls, model_config: Dict[str, Any]) -> int:
+        """Bir modelin BDR metni için efektif karakter sınırı (analyzer ile aynı mantık):
+        modelin kendi `max_input_chars`'ı → sağlayıcı limiti → genel varsayılan."""
+        return int(
+            model_config.get("max_input_chars")
+            or cls.PROVIDER_INPUT_LIMITS.get(model_config.get("provider", ""), cls.DEFAULT_MAX_INPUT_CHARS)
+        )
+
+    @classmethod
+    def model_bdr_degerlendirmesi(cls, model_config: Dict[str, Any], bdr_karakter: int) -> Dict[str, Any]:
+        """Model seçim ekranı için token bazlı detaylı teknik metrikler ve BDR uyumluluk analizi.
+
+        Dönüş: rozet, ozet, context_window_str, max_tokens_str, api_key_status, bdr_etiketi, uyarilar, secilebilir, bdr_token.
+        """
+        durum = str(model_config.get("durum") or "ok")
+        sinir_krk = cls.model_girdi_siniri(model_config)
+        etkin_sinir_krk = max(int(sinir_krk * cls.CHUNK_UTILIZATION), 1)
+        parca = 1 if bdr_karakter <= sinir_krk else (bdr_karakter + etkin_sinir_krk - 1) // etkin_sinir_krk
+        cikti_tavani = int(model_config.get("max_tokens") or 0)
+        provider = model_config.get("provider", "")
+        api_key_env = model_config.get("api_key_env", "")
+        api_key = os.getenv(api_key_env, "") if api_key_env else ""
+
+        # Token bazlı hesaplamalar (Türkçe BDR metinlerinde ortalama 1 Token ≈ 3.8 Karakter)
+        bdr_token = round(bdr_karakter / 3.8)
+        sinir_token = round(sinir_krk / 3.8)
+
+        # Context Window & Output Stringler (Standart Yapay Zeka Terimleri)
+        context_str = model_config.get("context_window") or f"~{sinir_token:,} Token"
+        output_str = f"{cikti_tavani:,} Token" if cikti_tavani else "Unspecified"
+
+        # API Key Durumu
+        if provider == "mock":
+            api_key_status = "✅ Mock Mode (No Key Required)"
+            has_key = True
+        elif api_key:
+            api_key_status = f"✅ Key Active (`{api_key_env}`)"
+            has_key = True
+        else:
+            api_key_status = f"❌ Missing Key (`.env: {api_key_env}`)"
+            has_key = False
+
+        uyarilar: List[str] = []
+        if model_config.get("durum_notu"):
+            uyarilar.append(str(model_config["durum_notu"]))
+
+        cok_dusuk_cikti = 0 < cikti_tavani < 8000
+
+        if parca > 1:
+            uyarilar.append(
+                f"Seçili BDR (~{bdr_token:,} Token), modelin Context Window sınırını (~{sinir_token:,} Token) "
+                f"aşıyor → ~{parca} parçada Map-Reduce yöntemiyle işlenir."
+            )
+        if cok_dusuk_cikti:
+            uyarilar.append(f"Düşük Max Output Tokens ({cikti_tavani:,} Token) — Analiz yanıtı kesilebilir.")
+        if provider == "huggingface":
+            uyarilar.append("HuggingFace Router: Sunucu yoğunluğuna göre işlem süresi değişkenlik gösterebilir.")
+        if not has_key and provider != "mock":
+            uyarilar.append(f"Çalıştırmak için .env dosyasında {api_key_env} tanımlanmalıdır.")
+
+        if not has_key and provider != "mock":
+            rozet = "⚠️"
+            bdr_etiketi = "🔑 API Key Eksik"
+        elif parca == 1 and not cok_dusuk_cikti:
+            rozet = "🟢"
+            bdr_etiketi = "⚡ Single Pass (İdeal & Hızlı)"
+        elif parca <= 4:
+            rozet = "🟡"
+            bdr_etiketi = f"🧩 Map-Reduce (~{parca} Parça)"
+        else:
+            rozet = "🔴"
+            bdr_etiketi = f"🐢 Yüksek Parçalama (~{parca} Parça - Yavaş)"
+
+        ozet = f"Context Window: {context_str} · Max Output: {output_str} · {bdr_etiketi}"
+
+        return {
+            "rozet": rozet,
+            "ozet": ozet,
+            "context_window_str": context_str,
+            "max_tokens_str": output_str,
+            "api_key_status": api_key_status,
+            "has_key": has_key,
+            "bdr_etiketi": bdr_etiketi,
+            "bdr_token": bdr_token,
+            "parca": parca,
+            "uyarilar": uyarilar,
+            "secilebilir": durum != "kullanilamaz",
+        }
+
+    @classmethod
     def get_pipeline_config(cls) -> Dict[str, Any]:
         block = cls.load_config().get("pipeline", {})
         return {**PIPELINE_DEFAULTS, **block}
@@ -150,3 +257,4 @@ class Config:
 
 
 Config.ensure_directories()
+Config.load_config()

@@ -4,6 +4,33 @@ Biçim: her giriş bir çalışma oturumunu özetler. Tarihler mutlaktır.
 
 ---
 
+## 2026-09-04 — Model seçim ekranı: uygunluk sınıflandırması + bilinen sorunlar
+
+Benchmark koşumunda `claude-sonnet-4-5` (32K çıktı tavanı aşıldı) ve `hf-deepseek-v3`
+(HF router yalnızca 'conversational' sunuyor) hata verdi. Kullanıcı bu sınırları model
+seçim ekranından görebilsin istiyor.
+
+- **`config.json`**: modellere opsiyonel `durum` (`ok` | `riskli` | `kullanilamaz`) +
+  `durum_notu` (serbest metin). `hf-deepseek-v3` → `kullanilamaz`; `claude-sonnet-4-5`
+  → `riskli` + `max_tokens` 32000 → 64000, `max_input_chars` 180000.
+- **`providers/anthropic_provider.MAX_OUTPUT_TOKENS`** 32000 → 64000 (Sonnet 4.5 native,
+  beta başlığı gerektirmez).
+- **`config.model_girdi_siniri`** + **`config.model_bdr_degerlendirmesi(cfg, bdr_krk)`**
+  (yeni): seçili BDR için model başına rozet (✅/⚠️/❌), tek satır özet (girdi sınırı, bu
+  BDR kaç parça, çıktı tavanı, sağlayıcı) ve uyarı listesi. ⚠️ = bilinen risk / çok düşük
+  çıktı tavanı (<8k) / aşırı parçalanma (>12); normal chunk'lama badge'i bozmaz, bilgi
+  satırında görünür.
+- **`ui/sidebar.py`**: her model checkbox'ı `{rozet} {ad}` + altında özet + uyarılar;
+  `kullanilamaz` model seçilirse analiz dışı bırakılır (kırmızı uyarı).
+- **`ui/tabs.py`** (pipeline ensemble multiselect): `kullanilamaz` modeller listeden
+  çıkarıldı; seçenek etiketi rozet + özet gösteriyor, seçili modellerin uyarıları altta.
+
+Doğrulama: `py_compile` + UI import + `model_bdr_degerlendirmesi` büyük (612k) / küçük
+(45k) BDR ile denendi. `hf-deepseek-v3` HF-provider routing düzeltmesi (conversational
+görev zorlama) canlı test gerektirdiğinden ertelendi.
+
+---
+
 ## 2026-09-04 — Kalite kalibrasyonu: taksonomi + tekrar-dedup + alıntı bütünlüğü
 
 Borusan 2024 BDR altı turda gerçek API ile koşuldu (24 → 23 → 35 → 19 → 32 → 32 risk).
@@ -92,17 +119,18 @@ prompt talimatı bu spesifik deseni güvenilir bastıramıyor.
 - **Prompt (4. turda eklendi):** `reconciler_v1.md` + `critic_v1.md` "roll-up sayma/
   ekleme" maddesi + somut örnek; `synthesis_v1.md` "konsolidasyonu özet metnine yaz"
   notu. Bunlar duruyor ama tek başına yetmiyor.
-- **`dedupe.rollup_ele`** (deterministik, `synthesis.sentezle` içinde `dedup_risk_dicts`
-  sonrası): `tutar_bilgisi`+`detay`+`baslik`'ten 4+ haneli sayıları (yıl hariç, ayıraç
-  temizlenir) çıkarır. Bir kalemin **HER** sayısı, aynı kategorideki başka ≥2 kalemde de
-  geçiyorsa (kendine özgü hiç sayı getirmiyor) → çıkar.
-- **7. tur sonrası güçlendirildi:** eski mantık "tekil kalemin TÜM sayıları roll-up'ın
-  içinde" idi — tekil kalemler ham tablo satırından fazladan sayı taşıyınca (`"...34
-  4.156 296.673 118 10.078"`) eşleşme bozuluyordu. Yeni mantık sayı-bazlı kapsama:
-  roll-up'ın her sayısı ayrı ayrı ≥2 başka kalemde aranır; "Azami Kredi Riski" gibi
-  kendine özgü tutarı olan kalemler korunur.
-- Birim test (`check_rollup.py`): kanonik roll-up (tekiller fazla sayılı) 4→3;
+- **`dedupe.is_rollup_of(aday, digerleri) -> bool`** (deterministik predikat) +
+  **`dedupe.rollup_ele(riskler)`** (onun üstünde liste filtresi). `synthesis.sentezle`
+  içinde `dedup_risk_dicts` sonrası çağrılıyor. `tutar_bilgisi`+`detay`+`baslik`'ten 4+
+  haneli sayıları (yıl hariç, ayıraç temizlenir) çıkarır: bir kalemin **HER** sayısı,
+  aynı kategorideki başka ≥2 kalemde de geçiyorsa (kendine özgü hiç tutar getirmiyor)
+  → roll-up. Tekil kalemler ham tablo satırından fazladan sayı taşısa bile çalışır
+  (aday ⊆ diğer DEĞİL, aday'ın her sayısı ≥1 diğerinde aranır).
+- "Azami Kredi Riski" gibi kendine özgü tutarı (2.356.131) olan kalemler korunur.
+- Birim test (`check_rollup.py`, 4/4): kanonik roll-up (tekiller fazla sayılı) 4→3;
   regresyon — Azami Kredi Riski korunur, tek kapsayan elenmez, farklı kategori kapsamaz.
+- **Not — `is_rollup_of()` = task dokümanındaki isim.** 5. turda "yapılacak" diye
+  işaretlenmişti; 6. turda `rollup_ele` olarak eklendi, bu turda predikat ismi ayrıldı.
 
 ### SORUN 1C — 2 yeni "Diğer" boşluğu (5. tur) — ✅ ÇÖZÜLDÜ
 
@@ -168,7 +196,7 @@ ile birleştirip tek "birebir alıntı" sunuyor → `partial_ratio` ardışık b
 **3.-6. tur:** her turda ≤%9 doğrulanamayan (%52 → 0-9). Orijinal "..." deseni kalıcı
 çözüldü — bu bölüme dokunulmadı.
 
-### SORUN 3B — sayı/tablo format uyuşmazlığı (yanlış-pozitif ret) — 🟢 İKİ KOLLU ÇÖZÜM
+### SORUN 3B — sayı/tablo format uyuşmazlığı (yanlış-pozitif ret) — ✅ ÇÖZÜLDÜ (7.+8. tur 0 doğrulanamayan)
 
 6.-7. tur: 2-3/32 kalem doğrulanamadı, "..." YOK. İki alt-sebep, iki çözüm:
 1. **Roll-up kalemi = 3B kurbanı da** (Not 34'ün iki satırını birleştiriyor → hem tekrar
@@ -220,16 +248,16 @@ geçti — kategori normalizasyonu (1C dahil), `rollup_ele` (5→4), `_kategori_
 fuzzy dedup, grounding "…" farkındalığı. Mock batch koşumu zengin ilerleme çıktısını
 doğruladı.
 
-6.-7. tur: "Diğer" 0, kategoriler doğru. **7. turda roll-up kalemi TEKRAR çıktı** (3.
-kez) → `rollup_ele` sayı-bazlı kapsamaya güçlendirildi + `check_rollup.py` eklendi.
+6.-8. tur: "Diğer" 0 (3 kez üst üste), doğrulanamayan 0 (7.+8. tur — SORUN 3B de
+efektif kapandı). **8. tur 24 risk, roll-up YOK.** SORUN 2C 4 koşumdan 2'sinde çıktı
+→ prompt güvenilmez; `is_rollup_of` deterministik garanti artık devrede.
 SORUN 2D (critic şişmesi) açık, kullanıcı öncelik vermedi.
 
 ⚠️ **Streamlit'ten koşuyorsan:** dosya değişikliği sonrası Python modülleri önbelleğe
 alındığı için **sunucuyu yeniden başlat** (Ctrl+C → tekrar `streamlit run`), yoksa
-`rollup_ele` gibi yeni kod devreye girmez.
+yeni kod (`is_rollup_of`, grounding normalizasyonu) devreye girmez.
 
-8. tur bekliyor: güçlendirilmiş `rollup_ele` roll-up'ı gerçekten eliyor mu (2-3 kez),
-3B format-kurbanları doğrulanıyor mu.
+9. tur bekliyor: restart sonrası aynı BDR ile 2-3 kez — roll-up gerçekten elendi mi.
 
 **Bilinen limit:** `partial_ratio@85` uzun cümlede tek rakam-grubu değişimini (ör.
 `513.245`→`999.111`) yakalamıyor — deterministik sayı-çıkarımlı kontrol (Faz 11.5).

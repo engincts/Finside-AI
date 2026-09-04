@@ -60,6 +60,11 @@ class GeminiProvider(BaseProvider):
                     )
                 break
             except Exception as e:
+                err_s = str(e)
+                if ("INVALID_ARGUMENT" in err_s or "response_schema" in err_s) and "response_schema" in config_kwargs:
+                    config_kwargs.pop("response_schema", None)
+                    gen_config = genai_types.GenerateContentConfig(**config_kwargs)
+                    continue
                 if self._rate_limited(e) and deneme + 1 < _RATE_LIMIT_DENEME:
                     time.sleep(_RATE_LIMIT_BEKLEME_SN)
                     continue

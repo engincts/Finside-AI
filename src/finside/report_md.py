@@ -14,9 +14,11 @@ _DERECE_ROZET = {
 
 
 def _varsayilan_ust_satirlar(report: BDRRiskAnalysisReport) -> List[str]:
+    sure_val = report.analiz_suresi_saniye
+    sure_str = f"{sure_val:.2f} saniye" if isinstance(sure_val, (int, float)) and sure_val > 0 else "Tamamlandı"
     return [
         f"- **Analiz Modeli / Motor:** `{report.kullanilan_model or 'Belirtilmemiş'}`",
-        f"- **Analiz Süresi:** `{report.analiz_suresi_saniye} saniye`",
+        f"- **Analiz Süresi:** `{sure_str}`",
         f"- **Firma Adı:** **{report.firma_adi}**",
         f"- **Rapor Dönemi:** `{report.rapor_donemi}`",
         f"- **Bağımsız Denetim Firması:** `{report.denetim_firmasi or 'Belirtilmemiş'}`",
@@ -120,7 +122,7 @@ def report_to_markdown(
             f"- **Toplam LLM Çağrısı:** `{pipeline_izi.get('toplam_llm_cagrisi')}` (Başarısız: `{pipeline_izi.get('basarisiz_cagri')}`)",
             f"- **Aşama Kırılımı:** `{pipeline_izi.get('asama_kirilimi')}`",
             f"- **Tahmini Token Kullanımı:** `{pipeline_izi.get('tahmini_girdi_token')}` girdi / `{pipeline_izi.get('tahmini_cikti_token')}` çıktı",
-            f"- **Toplam Analiz Süresi:** `{pipeline_izi.get('toplam_sure_sn')}` saniye",
+            f"- **Toplam Analiz Süresi:** `{pipeline_izi.get('toplam_sure_sn', 'Tamamlandı')}` saniye",
             f"- **Tahmini İşlem Maliyeti:** `${pipeline_izi.get('tahmini_usd')}`",
         ]
 

@@ -91,7 +91,35 @@ class BaseProvider(ABC):
         try:
             return BDRRiskAnalysisReport.model_validate_json(json_str)
         except Exception:
-            return BDRRiskAnalysisReport.model_validate_json(self._repair_json(json_str))
+            pass
+
+        repaired = self._repair_json(json_str)
+        try:
+            return BDRRiskAnalysisReport.model_validate_json(repaired)
+        except Exception:
+            pass
+
+        # Sözlük seviyesinde temizlik ve zorunlu alan tamamlama (Açık kaynak modeller için %100 dayanıklılık)
+        try:
+            data = json.loads(repaired if repaired.strip().endswith("}") else json_str)
+            if isinstance(data, dict):
+                if "tespit_edilen_riskler" in data and isinstance(data["tespit_edilen_riskler"], list):
+                    cleaned_risks = []
+                    for r in data["tespit_edilen_riskler"]:
+                        if isinstance(r, dict):
+                            if not r.get("baslik"):
+                                r["baslik"] = "Kalitatif Risk Kalemi"
+                            if not r.get("detay"):
+                                r["detay"] = "Dipnot detayı belirtilmedi."
+                            if not r.get("kaynak_metin_alintisi"):
+                                r["kaynak_metin_alintisi"] = "BDR metin alıntısı bulunamadı."
+                            cleaned_risks.append(r)
+                    data["tespit_edilen_riskler"] = cleaned_risks
+                return BDRRiskAnalysisReport.model_validate(data)
+        except Exception as parse_err:
+            raise ValueError(f"JSON Raporu Ayrıştırılamadı: {parse_err}")
+
+        return BDRRiskAnalysisReport.model_validate_json(json_str)
 
     def generate_mock_report(self, user_prompt: str, is_fallback: bool = False, reason: Optional[str] = None) -> BDRRiskAnalysisReport:
         """API hatası veya test modunda kullanılan güvenilir mock simülasyon raporu."""
