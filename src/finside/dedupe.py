@@ -141,10 +141,23 @@ def _is_jenerik_etki(etki: str) -> bool:
     return False
 
 
+_NARRATIVE_AUDIT_PATTERNS = re.compile(
+    r"(denetç|denetim|kam\b|kilit\s+denetim|iç\s+kontrol|zafiyet|faaliyet\s+süreklili|going\s+concern|bilanço\s+sonrası|birleşme|satın\s+alma|yönetsel|uyum|ilişkili\s+taraf)",
+    re.IGNORECASE
+)
+
+
+def _is_narrative_category(risk: dict) -> bool:
+    kat = str(risk.get("risk_kategorisi") or "").lower()
+    baslik = str(risk.get("baslik") or "").lower()
+    return bool(_NARRATIVE_AUDIT_PATTERNS.search(f"{kat} {baslik}"))
+
+
 def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
     """Tüm gruplardan gelen kalemler arasında jenerik/sözde (örn: 'Kur Riski', 'Likidite Riski') ve
     şablon etki cümleli tekrarlayan kalemleri eler ve kaynak modellerini spesifik kaleme aktarır.
-    Kategori kısıtlaması olmaksızın küresel (global) çalışır.
+    Anlatı-tabanlı denetim ve birleşme kategorileri (İç Kontrol, KAM, Faaliyet Sürekliliği)
+    rakamsız olsa dahi korunur.
     """
     if len(riskler) < 2:
         return list(riskler)
@@ -155,7 +168,13 @@ def jenerik_ve_tekrarlayan_ele(riskler: List[dict]) -> List[dict]:
             continue
         baslik = _norm(risk.get("baslik") or "")
         etki = risk.get("etki_degerlendirmesi") or ""
-        is_jenerik = _is_jenerik_etki(etki) or not risk.get("tutar_bilgisi") or "Tutarsız" in str(risk.get("tutar_bilgisi")) or "Belirtilmemiş" in str(risk.get("tutar_bilgisi"))
+
+        # Anlatı tabanlı denetim/birleşme kalemleri rakamsız olsa dahi jenerik sayılmaz
+        is_narrative = _is_narrative_category(risk)
+        if is_narrative:
+            is_jenerik = False
+        else:
+            is_jenerik = _is_jenerik_etki(etki) or not risk.get("tutar_bilgisi") or "Tutarsız" in str(risk.get("tutar_bilgisi")) or "Belirtilmemiş" in str(risk.get("tutar_bilgisi"))
 
         for j, diger in enumerate(riskler):
             if i == j or j in elenen_indeksler:

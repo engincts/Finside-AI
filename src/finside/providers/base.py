@@ -46,8 +46,14 @@ class BaseProvider(ABC):
         """Metin içindeki en dıştaki geçerli JSON objesini ({ ... }) temizler ve çıkarır."""
         if not text:
             return "{}"
-        
+
         text = text.strip()
+        # DeepSeek / Qwen style reasoning tags temizliği (<think>...</think>)
+        if "<think>" in text and "</think>" in text:
+            text = text.split("</think>")[-1].strip()
+        elif "<think>" in text:
+            text = text.split("<think>")[-1].strip()
+
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
@@ -63,12 +69,21 @@ class BaseProvider(ABC):
         return text[start:].strip() if start != -1 else text
 
     def _repair_json(self, text: str) -> str:
-        """Kesilmiş JSON'u açık parantez/tırnakları kapatarak kurtarmayı dener."""
-        text = text.strip().rstrip(",")
+        """Kesilmiş veya hatalı JSON'u (trailing comma, açık tırnak/parantez) kurtarmayı dener."""
+        if not text:
+            return "{}"
+
+        # 1. Trailing comma temizliği (ör. {"a": 1,} -> {"a": 1})
+        text = re.sub(r',\s*([}\]])', r'\1', text.strip())
+
+        # 2. Açık parantez ve tırnak takibi
         stack = []
         in_str = False
         esc = False
+        cleaned_chars = []
+
         for ch in text:
+            cleaned_chars.append(ch)
             if in_str:
                 if esc:
                     esc = False
@@ -81,45 +96,95 @@ class BaseProvider(ABC):
             elif ch in "{[":
                 stack.append("}" if ch == "{" else "]")
             elif ch in "}]" and stack:
-                stack.pop()
+                if stack[-1] == ch:
+                    stack.pop()
+
+        repaired = "".join(cleaned_chars)
         if in_str:
-            text += '"'
-        return text + "".join(reversed(stack))
+            repaired += '"'
+
+        # Trailing comma tekrar temizlenir
+        repaired = re.sub(r',\s*$', '', repaired.strip())
+        repaired += "".join(reversed(stack))
+        return re.sub(r',\s*([}\]])', r'\1', repaired)
 
     def _parse_report(self, raw_text: str) -> BDRRiskAnalysisReport:
         json_str = self._extract_json(raw_text)
+
+        # 1. Doğrudan Pydantic validasyonu
         try:
             return BDRRiskAnalysisReport.model_validate_json(json_str)
         except Exception:
             pass
 
+        # 2. Tamir edilmiş JSON ile Pydantic validasyonu
         repaired = self._repair_json(json_str)
         try:
             return BDRRiskAnalysisReport.model_validate_json(repaired)
         except Exception:
             pass
 
-        # Sözlük seviyesinde temizlik ve zorunlu alan tamamlama (Açık kaynak modeller için %100 dayanıklılık)
-        try:
-            data = json.loads(repaired if repaired.strip().endswith("}") else json_str)
-            if isinstance(data, dict):
-                if "tespit_edilen_riskler" in data and isinstance(data["tespit_edilen_riskler"], list):
-                    cleaned_risks = []
-                    for r in data["tespit_edilen_riskler"]:
-                        if isinstance(r, dict):
-                            if not r.get("baslik"):
-                                r["baslik"] = "Kalitatif Risk Kalemi"
-                            if not r.get("detay"):
-                                r["detay"] = "Dipnot detayı belirtilmedi."
-                            if not r.get("kaynak_metin_alintisi"):
-                                r["kaynak_metin_alintisi"] = "BDR metin alıntısı bulunamadı."
-                            cleaned_risks.append(r)
-                    data["tespit_edilen_riskler"] = cleaned_risks
-                return BDRRiskAnalysisReport.model_validate(data)
-        except Exception as parse_err:
-            raise ValueError(f"JSON Raporu Ayrıştırılamadı: {parse_err}")
+        # 3. json.loads / ast.literal_eval ile esnek sözlük dönüşümü
+        data = None
+        for candidate in (repaired, json_str):
+            try:
+                data = json.loads(candidate)
+                if isinstance(data, dict):
+                    break
+            except Exception:
+                pass
+            try:
+                import ast
+                # Tek tırnaklı veya Python dict sözdizimi için literal_eval
+                eval_data = ast.literal_eval(candidate)
+                if isinstance(eval_data, dict):
+                    data = eval_data
+                    break
+            except Exception:
+                pass
 
-        return BDRRiskAnalysisReport.model_validate_json(json_str)
+        if isinstance(data, dict):
+            # Sözlük alanlarını Pydantic şemasına tam uyumlu hale getir
+            if "tespit_edilen_riskler" in data and isinstance(data["tespit_edilen_riskler"], list):
+                cleaned_risks = []
+                for r in data["tespit_edilen_riskler"]:
+                    if isinstance(r, dict):
+                        if not r.get("baslik"):
+                            r["baslik"] = "Kalitatif Risk Kalemi"
+                        if not r.get("detay"):
+                            r["detay"] = "Dipnot detayı belirtilmedi."
+                        if not r.get("kaynak_metin_alintisi"):
+                            r["kaynak_metin_alintisi"] = "BDR metin alıntısı bulunamadı."
+                        cleaned_risks.append(r)
+                data["tespit_edilen_riskler"] = cleaned_risks
+            try:
+                return BDRRiskAnalysisReport.model_validate(data)
+            except Exception as val_err:
+                pass
+
+        # 4. Hiçbiri çalışmazsa son derece güvenli kısmi risk çıkarımı
+        try:
+            risk_matches = re.findall(r'"baslik"\s*:\s*"([^"]+)"', raw_text)
+            if risk_matches:
+                items = [
+                    BDRRiskItem(
+                        baslik=m,
+                        detay="Metinden otomatik ayrıştırılmış risk detayı.",
+                        risk_kategorisi=RiskKategorisi.DIGER_KALITATIF,
+                    )
+                    for m in risk_matches
+                ]
+                return BDRRiskAnalysisReport(
+                    firma_adi="Belirtilmemiş Şirket",
+                    rapor_donemi="Belirtilmemiş Dönem",
+                    tespit_edilen_riskler=items,
+                    genel_kredi_risk_ozeti="Model çıktısından kısmi risk kalemleri ayrıştırıldı.",
+                    analist_gerekce_metni="LLM ham yanıtından regex ile kurtarılan risk kalemleri.",
+                )
+        except Exception:
+            pass
+
+        raise ValueError(f"JSON Raporu Ayrıştırılamadı: Metin geçerli JSON veya risk nesnesi içermiyor. (Ham uzunluk: {len(raw_text)} kr)")
 
     def generate_mock_report(self, user_prompt: str, is_fallback: bool = False, reason: Optional[str] = None) -> BDRRiskAnalysisReport:
         """API hatası veya test modunda kullanılan güvenilir mock simülasyon raporu."""

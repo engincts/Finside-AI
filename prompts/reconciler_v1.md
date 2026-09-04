@@ -20,6 +20,7 @@ Görevin: bunları TEK, tutarlı ve tekrarsız bir risk listesine indirgemek.
   roll-up'tır — çıkar.
 - `risk_derecesi` çelişkilerinde en ihtiyatlı (yüksek) değeri seç.
 - `dipnot_referansi` farklıysa metindeki özgün referansı koru; emin değilsen birleştirme.
+- ZORUNLU KORUMA: İşletme Birleşmeleri (Berg EuroPipe/BMB Holding), İç Kontrol Zafiyetleri/KAM ve Faaliyet Sürekliliği (Going Concern) kalemlerini tutar içermese dahi KESİNLİKLE ELEME ve koru.
 - Hiçbir gerçek riski atma; şüphedeysen ayrı kalem olarak bırak.
 - `kaynak_metin_alintisi` TEK, ARDIŞIK bir parça olmalı. Birden fazla cümleyi/uzak sayıyı
   "..." ile birleştiren bir alıntıyı temsili tek parçaya indir; kalan rakamları `detay`'a
