@@ -29,7 +29,8 @@ def riskleri_temizle(riskler: List[dict], model_id: str) -> Tuple[List[dict], Li
         )
         if sonuc.report and sonuc.report.tespit_edilen_riskler and not sonuc.report.is_mock_fallback:
             temiz = [r.model_dump() for r in sonuc.report.tespit_edilen_riskler]
-            return temiz, sonuc.trace
+            return temiz, [sonuc.trace]
+        return riskler, [sonuc.trace] if sonuc else []
     except Exception:
         pass
 
