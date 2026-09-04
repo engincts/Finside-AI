@@ -137,6 +137,6 @@ def qa_kontrol(state: PipelineState) -> dict:
 
     md_content = report_to_markdown(nihai)
     ReportWriter.save_final_report(session_dir, nihai, md_content)
-    ReportWriter.save_trace(session_dir, [dict(t) for t in state.get("trace", []) if isinstance(t, dict) or hasattr(t, "items")])
+    ReportWriter.save_trace(session_dir, state.get("trace", []))
 
     return {"nihai_rapor": veri, "qa_bayraklari": bayraklar}

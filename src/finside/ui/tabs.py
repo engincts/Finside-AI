@@ -236,13 +236,22 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         for uyari in _deg[mid]["uyarilar"]:
             st.caption(f"⚠️ {mid}: {uyari}")
 
-    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
-        st.caption("Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
+    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
+        st.caption("Triyaj, Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
+        t_idx = model_secenekleri.index(pipeline_cfg.get("triage_model")) if pipeline_cfg.get("triage_model") in model_secenekleri else 0
         r_idx = model_secenekleri.index(pipeline_cfg.get("reconciler_model")) if pipeline_cfg.get("reconciler_model") in model_secenekleri else 0
         c_idx = model_secenekleri.index(pipeline_cfg.get("critic_model")) if pipeline_cfg.get("critic_model") in model_secenekleri else 0
         san_default = pipeline_cfg.get("sanitizer_model", pipeline_cfg.get("critic_model"))
         san_idx = model_secenekleri.index(san_default) if san_default in model_secenekleri else 0
         s_idx = model_secenekleri.index(pipeline_cfg.get("synthesis_model")) if pipeline_cfg.get("synthesis_model") in model_secenekleri else 0
+
+        pipe_triage = st.selectbox(
+            "🎯 Triyaj (Triage) Modeli",
+            options=model_secenekleri,
+            index=t_idx,
+            help="200+ sayfalık BDR metin parçalarını hızla tarayarak kredi riski taşıma ihtimali yüksek kilit dipnotları önceliklendirir."
+        )
+        st.caption("💡 **Triyaj Ajanı:** BDR bölümlerini taranacaklar / elenecekler olarak hızlı ön sınıflandırmaya tabi tutar.")
 
         pipe_reconciler = st.selectbox(
             "🤝 Uzlaştırma (Reconciler) Modeli",
@@ -278,6 +287,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
 
         # Config pipeline ayarlarını oturum içi dinamik güncelle
         Config.update_pipeline_config(
+            triage=pipe_triage,
             reconciler=pipe_reconciler,
             critic=pipe_critic,
             sanitizer=pipe_sanitizer,

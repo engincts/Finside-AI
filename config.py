@@ -10,13 +10,13 @@ load_dotenv(BASE_DIR / ".env")
 CONFIG_JSON_PATH = BASE_DIR / "config.json"
 
 PIPELINE_DEFAULTS: Dict[str, Any] = {
-    "map_models": [],
-    "triage_model": "gpt-4o-mini",
-    "reconciler_model": "claude-sonnet-4-5",
-    "critic_model": "gemini-3.6-flash",
-    "sanitizer_model": "gemini-3.6-flash",
-    "synthesis_model": "claude-sonnet-4-5",
-    "segmenter_fallback_model": "gemini-3.6-flash",
+    "map_models": ["qwen3-coder-30b", "gpt-oss-120b"],
+    "triage_model": "qwen3-omni-30b",
+    "reconciler_model": "gpt-oss-120b",
+    "critic_model": "gpt-oss-120b",
+    "sanitizer_model": "qwen3-omni-30b",
+    "synthesis_model": "gpt-oss-120b",
+    "segmenter_fallback_model": "qwen3-omni-30b",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,
@@ -93,6 +93,7 @@ class Config:
     @classmethod
     def update_pipeline_config(
         cls,
+        triage: Optional[str] = None,
         reconciler: Optional[str] = None,
         critic: Optional[str] = None,
         sanitizer: Optional[str] = None,
@@ -101,6 +102,8 @@ class Config:
         cfg = cls.load_config()
         if "pipeline" not in cfg:
             cfg["pipeline"] = {}
+        if triage:
+            cfg["pipeline"]["triage_model"] = triage
         if reconciler:
             cfg["pipeline"]["reconciler_model"] = reconciler
         if critic:
