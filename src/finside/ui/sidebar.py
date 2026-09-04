@@ -76,14 +76,17 @@ def render_sidebar() -> SidebarState:
     )
 
     # Modelleri Kategorilere Ayırma
-    cloud_models = [m for m in all_models if m.get("provider") in ("gemini", "openai", "anthropic")]
-    hf_models = [m for m in all_models if m.get("provider") == "huggingface"]
+    embedder_models = [m for m in all_models if "embedding" in m.get("id", "") or "embed" in m.get("id", "")]
+    kloudeks_models = [m for m in all_models if ("qwen3" in m.get("id", "") or m.get("id") == "gpt-oss-120b") and m not in embedder_models]
+    cloud_models = [m for m in all_models if m.get("provider") in ("gemini", "openai", "anthropic") and m not in kloudeks_models and m not in embedder_models]
+    hf_models = [m for m in all_models if m.get("provider") == "huggingface" and m not in kloudeks_models and m not in embedder_models]
     mock_models = [m for m in all_models if m.get("provider") == "mock"]
 
-    tab_cloud, tab_hf, tab_mock = st.sidebar.tabs([
-        "☁️ Bulut API",
+    tab_cloud, tab_hf, tab_embed, tab_mock = st.sidebar.tabs([
+        "🌐 Bulut Servisleri",
         "🤗 Açık Kaynak",
-        "🧪 Simülasyon"
+        "🧬 Vektör & Embedder",
+        "🧪 Test & Simülasyon"
     ])
 
     def _render_model_cards(model_list: List[dict]):
@@ -121,7 +124,15 @@ def render_sidebar() -> SidebarState:
         _render_model_cards(cloud_models)
 
     with tab_hf:
+        st.markdown("#### 🏛️ Kloudeks Mia (KKB Kurumsal Altyapı)")
+        st.caption("KKB bünyesinde sunulan Kloudeks Mia açık kaynak modelleri:")
+        _render_model_cards(kloudeks_models)
+        st.markdown("#### 🚀 Diğer Açık Kaynak Modeller (HuggingFace)")
         _render_model_cards(hf_models)
+
+    with tab_embed:
+        st.sidebar.info("📐 **Vektör & Embedding Motoru:**\n\nBu modeller metin üretimi için değil; BDR dipnot risklerinin vektörleştirilmesi ve Kosinüs Benzerliği (Cosine Similarity) ile mükerrer risklerin tekleştirilmesi (Dedupe) için kullanılır.")
+        _render_model_cards(embedder_models)
 
     with tab_mock:
         _render_model_cards(mock_models)

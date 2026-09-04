@@ -71,22 +71,34 @@ class ReportWriter:
         )
 
     @classmethod
-    def append_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+    def _clean_trace_item(cls, item: Any) -> Dict[str, Any]:
+        if isinstance(item, dict):
+            return item
+        if hasattr(item, "model_dump"):
+            return item.model_dump()
+        if hasattr(item, "to_dict"):
+            return item.to_dict()
+        if hasattr(item, "__dict__"):
+            return vars(item)
+        return {"raw_trace": str(item)}
+
+    @classmethod
+    def append_trace(cls, session_dir: Path, kayitlar: List[Any]):
         """Pipeline LLM çağrı izlerini satır satır `trace.jsonl`'e ekler (append)."""
         if not kayitlar:
             return
         trace_path = session_dir / "trace.jsonl"
         with open(trace_path, "a", encoding="utf-8") as f:
             for kayit in kayitlar:
-                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+                f.write(json.dumps(cls._clean_trace_item(kayit), ensure_ascii=False) + "\n")
 
     @classmethod
-    def save_trace(cls, session_dir: Path, kayitlar: List[Dict[str, Any]]):
+    def save_trace(cls, session_dir: Path, kayitlar: List[Any]):
         """Birikmiş tüm trace kayıtlarını `trace.jsonl`'e yazar (üzerine, tekrarsız)."""
         trace_path = session_dir / "trace.jsonl"
         with open(trace_path, "w", encoding="utf-8") as f:
             for kayit in kayitlar:
-                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+                f.write(json.dumps(cls._clean_trace_item(kayit), ensure_ascii=False) + "\n")
 
     @classmethod
     def save_summary_metrics(cls, session_dir: Path, bdr_name: str, metrics_list: List[Dict[str, Any]]):
