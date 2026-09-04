@@ -1,4 +1,4 @@
-# 🏦 Finside AI — Mimari ve Çalışma Mantığı Rehberi
+# 🏦 Finside AI — Mimari ve Teknik El Kitabı (Master Architecture)
 
 **Finside AI**, kurumsal Bağımsız Denetim Raporlarını (BDR), Mizan ve finansal tabloları yapay zeka modelleri ile otonom analiz eden hibrit bir karar destek sistemidir.
 
@@ -11,8 +11,8 @@ flowchart TD
     A["📄 Ham BDR Metni (200+ Sayfa)"] --> B["✂️ 1. Segmentasyon (Segmenting)"]
     B --> C["🎯 2. Triyaj (Triage & Önceliklendirme)"]
     C --> D["🗺️ 3. Ensemble Map (Çoklu Model Çıkarımı)"]
-    D --> E["🔍 4. Grounding & Doğrulama Motoru"]
-    E --> F["🤝 5. Uzlaştırma (Reconciliation)"]
+    D --> E["🔍 4. Grounding (Çok Katmanlı Doğrulama)"]
+    E --> F["🤝 5. Uzlaştırma (Reconciliation & Dedupe)"]
     F --> G["🕵️ 6. Critic (Eleştirmen Ajan Döngüsü)"]
     G --> H["🧩 7. Sentez (Synthesis & Rapor Birleştirme)"]
     H --> I["🛡️ 8. QA Kontrolü (Quality Assurance)"]
@@ -56,9 +56,56 @@ flowchart TD
 
 ---
 
-## 🏛️ 3. Bankacılık Standartlarında 5 Seviyeli Karar Sınıflandırması
+## 🔍 3. Grounding & Deduplikasyon Motoru
 
-Sistemimiz `KomiteKararEgilimi` veri modelinde bankacılık kredi riski yönetim standartlarına tam uyumlu 5 seviyeli karar sınıflandırmasını uygular:
+Grounding, yapay zekanın ürettiği alıntıların ham BDR metninde gerçekten var olduğunu doğrulayarak halüsinasyon riskini sıfırlar.
+
+### Grounding 3 Katmanlı Doğrulama Akışı:
+1. **Kanonik Normalizasyon (`_sadelestir_metin`):** Çoklu satırlar, tablar ve sayı formatları (nokta/virgül) standartlaştırılır (`"16.881.700 TL"` → `"16881700 tl"`).
+2. **Katman 1 — RapidFuzz Bulanık Eşleşme:** Metin içinde kısmi oran denetlenir (Eşik: `%70+`).
+3. **Katman 2 — Sayısal İmza Kümesi Denetimi (`_onemli_sayilar`):** Alıntıdaki 4+ haneli rakamlar regex ile çıkarılır ve kaynak metin penceresinde tam eşleşmesi denetlenir.
+4. **Katman 3 — N-Gram Kelime Kapsamı:** Anlamsal kelime örtüşmesi %75+ ise doğrulama geçer.
+
+### Tekilleştirme Süzgeci (Deduplication):
+* **Sayısal İmza (Number Fingerprinting):** İki kalemin sayısal değerleri %80+ ortaksa başlık farkına bakılmaksızın aynı kümede birleşir.
+* **Cosine Similarity & Vector Embeddings:** OpenAI Embeddings (`text-embedding-3-small`) veya yerel TF-IDF N-Gram Matrisi üzerinden metinlerin kosinüs açısı hesaplanır.
+* **Dipnot Önek Temizleme Regex'i:** `_DIPNOT_PREFIX_RE` ile `Dipnot 7 - Kısa Vadeli Borçlanmalar` ve `Kısa Vadeli Borçlanmalar` aynı başlık olarak eşleştirilip tekleştirilir.
+
+---
+
+## 🏢 4. Veri Şemaları ve Pydantic Modelleri
+
+Sistemde modeller arası veri transferini sağlayan temel Pydantic sınıfları:
+
+### 1. `BDRRiskAnalysisReport` (Nihai Rapor Nesnesi)
+- `firma_adi`: Analiz edilen şirketin ticari unvanı.
+- `rapor_donemi`: BDR rapor dönemi (Örn: 31 Aralık 2024).
+- `denetim_firmasi`: Bağımsız denetim kuruluşu (EY, PwC, Deloitte vb.).
+- `denetci_gorusu`: Olumlu / Şartlı Olumlu / Olumsuz / Kaçınma.
+- `tespit_edilen_riskler`: List[BDRRiskItem] (Konsolide edilmiş risk kalemleri).
+- `finansal_rasyo_ozeti`: `FinansalRasyoOzeti` (Likidite, borçluluk, YP açık pozisyonu).
+- `karar_egilimi`: `KomiteKararEgilimi` (5 Seviyeli Kredi Komitesi Tahsis Seviyesi kararı).
+- `komite_tavsiyesi_ve_sartlar`: List[str] (Kısıtlayıcı covenant şartları).
+- `analist_gerekce_metni`: 3-4 paragraflık kıdemli analist değerlendirmesi.
+
+### 2. `FinansalRasyoOzeti` (Tipleştirilmiş Rasyo Nesnesi)
+OpenAI Strict Mode ve Gemini API uyumluluğu için tipleştirilmiş özel nesnedir:
+- `cari_oran`, `likidite_orani`, `kaldirac_orani`, `net_borc_favok`, `ozkaynak_orani`, `net_doviz_pozisyonu`.
+
+---
+
+## 🤖 5. LLM Sağlayıcıları ve %100 Uyumluluk Motoru
+
+1. **OpenAI (GPT-4o, o1, o3-mini):**
+   - **Strict Structured Outputs:** `additionalProperties: false` kuralına %100 uyumlu tipleştirilmiş Pydantic şemaları kullanılır.
+2. **Google Gemini (Gemini 3.6 Flash, 3.1 Pro):**
+   - **Payload Schema Guard:** Gemini REST API'sinde hataya yol açan parametreler temizlenir. Herhangi bir `INVALID_ARGUMENT` durumunda otomatik `application/json` moduna düşülerek rapor kesintisiz ayrıştırılır.
+3. **HuggingFace & Açık Kaynak Modeller (Qwen 2.5, Llama 3.3, DeepSeek R1):**
+   - **Pre-Validator Fallbacks:** Açık kaynak modellerin eksik bıraktığı alanlar Pydantic ön-doğrulayıcıları (`@field_validator(mode="before")`) ile otomatik varsayılan değerlerle tamamlanır.
+
+---
+
+## 🏛️ 6. Bankacılık Standartlarında 5 Seviyeli Karar Sınıflandırması
 
 | Seviye | Karar Eğilimi | Kredi Riski Şartı | Banka Tahsis Aksiyonu |
 | :---: | :--- | :--- | :--- |
@@ -67,3 +114,4 @@ Sistemimiz `KomiteKararEgilimi` veri modelinde bankacılık kredi riski yönetim
 | 🟠 **3** | **Şartlı Olumlu (Ek Teminat / Limit Kısıtlı)** | Bağlı ortaklık TRİ veya kefalet yükü yüksek. | Kredi verilir; gayrimenkul ipoteği veya limit kısıtlaması koşulur. |
 | 🔵 **4** | **Askıda (Ek Denetim / Hukuki Görüş)** | Denetçi KAM veya dava karşılıklarında belirsizlik var. | Karar dondurulur; bağımsız denetçi açıklaması veya hukuki görüş istenir. |
 | 🔴 **5** | **Olumsuz (Yüksek Risk / Red)** | Faaliyet sürekliliği belirsizliği veya ağır zafiyet var. | Kredi talebi reddedilir; risklerin tasfiyesi başlatılır. |
+
