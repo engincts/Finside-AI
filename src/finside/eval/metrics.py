@@ -89,6 +89,10 @@ def sema_metrigi(rapor: dict, segment_sayisi: int = 0) -> Dict[str, Any]:
 
 
 def taban_puan(katman1: Dict[str, Any]) -> float:
+    """Gold set yoksa kaba kalite göstergesi. Kapsam (kategori) yüksek ağırlıklı:
+    grounding/sayısal, az risk üretilince kolayca 1.0 çıkar — bu tek başına
+    'iyi rapor' demek değildir, o yüzden düşük kapsam sert cezalandırılır.
+    """
     grounding = katman1["grounding"]["grounding_orani"]
     sayisal = katman1["sayisal"]["sayisal_tutarlilik_orani"]
     somut_etki = 1.0 - katman1["kapsam"]["jenerik_etki_orani"]
@@ -96,11 +100,11 @@ def taban_puan(katman1: Dict[str, Any]) -> float:
     qa = katman1["sema"]["qa_bayrak_sayisi"]
     qa_puan = max(0.0, 1.0 - 0.15 * qa) if qa >= 0 else 0.0
     puan = 100 * (
-        0.40 * grounding
-        + 0.20 * sayisal
-        + 0.15 * somut_etki
-        + 0.10 * kategori
-        + 0.15 * qa_puan
+        0.30 * grounding
+        + 0.15 * sayisal
+        + 0.20 * somut_etki
+        + 0.25 * kategori
+        + 0.10 * qa_puan
     )
     return round(puan, 1)
 

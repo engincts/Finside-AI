@@ -44,8 +44,10 @@ python run_eval.py --karsilastir eval/pipeline-v1 eval/gemini-tek
 
 ## `taban_puan` ağırlıkları (`metrics.taban_puan`)
 
-grounding %40 · sayısal tutarlılık %20 · somut etki (1−jenerik) %15 · kategori kapsamı %10 · QA temizliği %15.
-Ağırlıklar `metrics.py` içinde tek yerde; göreve göre ayarlanabilir.
+kategori kapsamı %25 · grounding %30 · somut etki (1−jenerik) %20 · sayısal tutarlılık %15 · QA temizliği %10.
+Kapsam yüksek ağırlıklı: az risk üretince grounding/sayısal kolayca 1.0 çıkar, bu tek başına
+"iyi rapor" değildir. Kesin recall için gold set (Katman 3) şart. Ağırlıklar `metrics.taban_puan`
+içinde tek yerde.
 
 ## Hakem modeli notu
 
