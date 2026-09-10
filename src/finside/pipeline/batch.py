@@ -26,14 +26,15 @@ def _checkpointer() -> Tuple[object, Optional[object]]:
             from langgraph.checkpoint.postgres import PostgresSaver
 
             if "connect_timeout" not in url:
-                url += ("&" if "?" in url else "?") + "connect_timeout=5"
+                url += ("&" if "?" in url else "?") + "connect_timeout=2"
             ctx = PostgresSaver.from_conn_string(url)
             saver = ctx.__enter__()
             saver.setup()
             return saver, ctx
         except Exception as exc:  # noqa: BLE001 — Postgres yoksa geliştirme durmasın
+            ozet = str(exc).splitlines()[0][:120]
             warnings.warn(
-                f"Postgres checkpointer kurulamadı ({exc}); MemorySaver'a düşülüyor.",
+                f"Postgres checkpointer kurulamadı ({ozet}); MemorySaver — batch resume kalıcı değil.",
                 stacklevel=2,
             )
     else:

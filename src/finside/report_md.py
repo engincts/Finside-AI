@@ -20,7 +20,7 @@ def report_to_markdown(
     pipeline_izi: Optional[dict] = None,
 ) -> str:
     lines: List[str] = [
-        "# 🏦 FINSIED AI — KURUMSAL KREDİ RİSK & KOMİTE DEĞERLENDİRME RAPORU",
+        "# 🏦 FINSIDE AI — KURUMSAL KREDİ RİSK & KOMİTE DEĞERLENDİRME RAPORU",
         "",
     ]
 
