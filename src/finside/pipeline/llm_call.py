@@ -1,12 +1,28 @@
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
 from config import Config
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
 from finside.pipeline.state import TraceKaydi
 from finside.models import BDRRiskAnalysisReport, KomiteKararEgilimi
+
+_T = TypeVar("_T")
+# Geçici HF/API kesintileri (503, timeout, "yanıt alınamadı") için artan beklemeli retry.
+_RETRY_BEKLEME_SN = (0.0, 4.0, 10.0)
+
+
+def _deneme_ile(fn: Callable[[], _T]) -> _T:
+    son_hata: Optional[Exception] = None
+    for bekleme in _RETRY_BEKLEME_SN:
+        if bekleme:
+            time.sleep(bekleme)
+        try:
+            return fn()
+        except Exception as err:  # noqa: BLE001 — son deneme de düşerse yeniden fırlatılır
+            son_hata = err
+    raise son_hata  # type: ignore[misc]
 
 
 def _hata_raporu(reason: str) -> BDRRiskAnalysisReport:
@@ -74,27 +90,41 @@ def rapor_cagrisi(
     if model_cfg is None:
         raise ValueError(f"Bilinmeyen model id: {model_id}")
 
-    provider_name = model_cfg.get("provider", "mock")
     if system_prompt is None:
         system_prompt, _ = PromptLoader.load_prompt_md(model_cfg["prompt_file"])
 
-    provider = ProviderFactory.create_provider(
-        provider_name=provider_name,
-        model_config=model_cfg,
-        system_prompt=system_prompt,
-        api_key=Config.get_api_key_for_model(model_cfg),
-    )
+    def _uret(cfg: dict) -> BDRRiskAnalysisReport:
+        provider = ProviderFactory.create_provider(
+            provider_name=cfg.get("provider", "mock"),
+            model_config=cfg,
+            system_prompt=system_prompt,
+            api_key=Config.get_api_key_for_model(cfg),
+        )
+        return _deneme_ile(lambda: provider.analyze(user_prompt))
 
+    provider_name = model_cfg.get("provider", "mock")
+    kullanilan_id = model_id
     start = time.perf_counter()
     try:
-        report = provider.analyze(user_prompt)
+        report = _uret(model_cfg)
     except Exception as err:
-        report = _hata_raporu(str(err))
+        # Retry'lar tükendi — farklı sağlayıcıdaki yedek modele geç (config.pipeline.fallback_model).
+        yedek_id = Config.get_pipeline_config().get("fallback_model")
+        yedek_cfg = Config.get_model_config_by_id(yedek_id) if yedek_id and yedek_id != model_id else None
+        if yedek_cfg:
+            try:
+                report = _uret(yedek_cfg)
+                kullanilan_id = f"{yedek_id} (yedek; {model_id} başarısız)"
+                provider_name = yedek_cfg.get("provider", "mock")
+            except Exception as yedek_err:
+                report = _hata_raporu(f"{err} | yedek {yedek_id}: {yedek_err}")
+        else:
+            report = _hata_raporu(str(err))
     elapsed = round(time.perf_counter() - start, 3)
 
     trace = _trace(
         asama=asama,
-        model_id=model_id,
+        model_id=kullanilan_id,
         provider=provider_name,
         girdi=user_prompt,
         cikti=report.model_dump_json(),
@@ -129,7 +159,7 @@ def ham_cagri(
     start = time.perf_counter()
     text, basari, hata = "", True, None
     try:
-        text = provider.raw_generate(user_prompt, json_mode=json_mode)
+        text = _deneme_ile(lambda: provider.raw_generate(user_prompt, json_mode=json_mode))
         if not text.strip():
             basari, hata = False, "boş yanıt"
     except Exception as exc:  # noqa: BLE001 — trace'e yazılıp devam edilir

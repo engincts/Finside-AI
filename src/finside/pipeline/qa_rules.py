@@ -84,12 +84,17 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
                     bul.add(r)
             return bul
 
+        def _yaklasik_var(hedef: str, kaynak: set) -> bool:
+            # "33.34 Milyar" (başlıkta yuvarlanmış → "3334") ile "33.341.512" (detayda
+            # tam → "33341512") aynı büyüklüktür: biri diğerinin ilk hanelerinden oluşuyorsa eşleşmiş say.
+            return any(s == hedef or s.startswith(hedef) or hedef.startswith(s) for s in kaynak)
+
         for r in riskler:
             baslik_sayilar = _tum_sayilar(_DIPNOT_ONEK_RE.sub("", r.baslik or ""))
             if baslik_sayilar:
                 detay_sayilar = _tum_sayilar(f"{r.detay or ''} {r.tutar_bilgisi or ''}")
-                if detay_sayilar and not baslik_sayilar.intersection(detay_sayilar):
-                    # Başlıkta sayı var ama detayda/tutar_bilgisi'nde bu sayı HİÇ geçmiyor ve başka sayılar var
+                eslesmeyen = {b for b in baslik_sayilar if not _yaklasik_var(b, detay_sayilar)}
+                if detay_sayilar and eslesmeyen == baslik_sayilar:
                     bayraklar.append(
                         f"RAKAM-TUTARSIZLIĞI: '{r.baslik[:45]}' kaleminde başlıkta geçen sayı ({', '.join(sorted(baslik_sayilar))}) "
                         f"detay metninde ({', '.join(sorted(detay_sayilar))}) doğrulanamadı veya çelişiyor."

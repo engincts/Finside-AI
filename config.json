@@ -15,6 +15,7 @@
     "sanitizer_model": "gpt-oss-120b",
     "synthesis_model": "gpt-oss-120b",
     "segmenter_fallback_model": "gpt-oss-120b",
+    "fallback_model": "gpt-4o",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,
