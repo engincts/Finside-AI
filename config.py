@@ -66,14 +66,7 @@ class Config:
     BASLIK_BENZERLIK_ESIGI: int = 90
     EMBED_API_KEY_ENV: str = "OPENAI_API_KEY"
 
-    # 5. Segmentasyon Ayarları (BDR Segmentation)
-    BEKLENEN_MIN_SEGMENT: int = 12
-    BEKLENEN_MAX_SEGMENT: int = 90
-    MIN_SEGMENT_KARAKTER: int = 300
-    YETERLI_SEGMENT: int = 10
-    LLM_GIRDI_KARAKTER_SINIRI: int = 200_000
-
-    # 6. LLM Token & Reasoning Haritası
+    # 5. LLM Token & Reasoning Haritası
     EFFORT_TOKEN_MAP: Dict[str, int] = {
         "low": 2048,
         "medium": 4096,
@@ -133,13 +126,6 @@ class Config:
                 merged = {**defaults, **m}
                 merged_models.append(merged)
         return merged_models
-
-    @classmethod
-    def get_model_by_id(cls, model_id: str) -> Optional[Dict[str, Any]]:
-        for m in cls.get_enabled_models():
-            if m.get("id") == model_id:
-                return m
-        return None
 
     @classmethod
     def get_api_key_for_model(cls, model_config: Dict[str, Any]) -> str:

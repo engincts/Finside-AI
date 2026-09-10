@@ -104,10 +104,8 @@ def calistir_batch(
 
             takipci = None
             if yaz is not None:
-                yaz("═" * 78)
-                yaz(f"📄 BDR: {dosya.name}  ({bilgi['character_count']:,} karakter)".replace(",", "."))
-                yaz(f"   Modeller — {model_rolleri_satiri(etkili_modeller)}")
-                yaz("═" * 78)
+                yaz(f"\nBDR: {dosya.name} ({bilgi['character_count']:,} karakter)".replace(",", "."))
+                yaz(f"Modeller — {model_rolleri_satiri(etkili_modeller)}")
                 takipci = ilerleme_takipcisi(yaz, etkili_modeller)
 
             state = _bdr_calistir(bilgi, dosya, session_dir, secili_modeller, graph, takipci)

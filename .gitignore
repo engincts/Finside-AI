@@ -33,6 +33,7 @@ env/
 
 # Project Outputs & Cache
 outputs/
+scratch/
 .cache/
 huggingface_cache/
 models_cache/
