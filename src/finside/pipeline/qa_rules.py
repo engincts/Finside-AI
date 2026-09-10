@@ -1,11 +1,15 @@
 """Faz 8 — Kural tabanlı tutarlılık kontrolü (LLM'siz son "akıl sağlığı" adımı)."""
 
+import re
 from typing import List
 
 from finside.models import BDRRiskAnalysisReport, DenetciGorusTuru, KomiteKararEgilimi, RiskDerecesi
 
 _DOGRULANMAMIS_ESIGI = 0.30
 _BOS_RISK_SEGMENT_ESIGI = 20
+# "Dipnot 25 - ...", "NOT 36 -", "Not.14 " gibi başlık önekleri — buradaki numara
+# bir tutar değil dipnot referansıdır, rakam-tutarsızlığı kontrolüne girmemeli.
+_DIPNOT_ONEK_RE = re.compile(r"^\s*(?:dipnot|not|note|md)\s*\.?\s*\d+\s*[-–—:.)]*\s*", re.IGNORECASE)
 
 
 def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[str]:
@@ -76,12 +80,12 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
             bul: set = set()
             for e in _SAYI_RE.findall(m or ""):
                 r = e.replace(".", "").replace(",", "")
-                if len(r) >= 2 and int(r) not in _YIL_ARALIGI:
+                if len(r) >= 3 and int(r) not in _YIL_ARALIGI:
                     bul.add(r)
             return bul
 
         for r in riskler:
-            baslik_sayilar = _tum_sayilar(r.baslik or "")
+            baslik_sayilar = _tum_sayilar(_DIPNOT_ONEK_RE.sub("", r.baslik or ""))
             if baslik_sayilar:
                 detay_sayilar = _tum_sayilar(f"{r.detay or ''} {r.tutar_bilgisi or ''}")
                 if detay_sayilar and not baslik_sayilar.intersection(detay_sayilar):
