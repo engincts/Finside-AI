@@ -8,13 +8,13 @@
   "default_strict_schema": true,
   "default_prompt_file": "bdr_analyst_v1.md",
   "pipeline": {
-    "map_models": ["qwen3-coder-30b", "gpt-oss-120b"],
-    "triage_model": "qwen3-omni-30b",
+    "map_models": ["gpt-oss-120b"],
+    "triage_model": "gpt-oss-120b",
     "reconciler_model": "gpt-oss-120b",
     "critic_model": "gpt-oss-120b",
-    "sanitizer_model": "qwen3-omni-30b",
+    "sanitizer_model": "gpt-oss-120b",
     "synthesis_model": "gpt-oss-120b",
-    "segmenter_fallback_model": "qwen3-omni-30b",
+    "segmenter_fallback_model": "gpt-oss-120b",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,
@@ -182,7 +182,9 @@
       "prompt_file": "bdr_analyst_v1.md",
       "usd_1k_in": 0.00006,
       "usd_1k_out": 0.0002,
-      "enabled": true
+      "durum": "kullanilamaz",
+      "durum_notu": "HF router'da güvenilir yanıt vermiyor; pipeline rollerinden çıkarıldı (2026-09-10).",
+      "enabled": false
     },
     {
       "id": "qwen3-embedding-8b",
@@ -233,6 +235,7 @@
       "prompt_file": "bdr_analyst_v1.md",
       "usd_1k_in": 0.00013,
       "usd_1k_out": 0.0004,
+      "durum_notu": "HF router'da strict JSON şemasını güvenilir üretmiyor (parse hatası); map rolü için uygun değil.",
       "enabled": false
     },
     {

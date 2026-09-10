@@ -10,13 +10,13 @@ load_dotenv(BASE_DIR / ".env")
 CONFIG_JSON_PATH = BASE_DIR / "config.json"
 
 PIPELINE_DEFAULTS: Dict[str, Any] = {
-    "map_models": ["qwen3-coder-30b", "gpt-oss-120b"],
-    "triage_model": "qwen3-omni-30b",
+    "map_models": ["gpt-oss-120b"],
+    "triage_model": "gpt-oss-120b",
     "reconciler_model": "gpt-oss-120b",
     "critic_model": "gpt-oss-120b",
-    "sanitizer_model": "qwen3-omni-30b",
+    "sanitizer_model": "gpt-oss-120b",
     "synthesis_model": "gpt-oss-120b",
-    "segmenter_fallback_model": "qwen3-omni-30b",
+    "segmenter_fallback_model": "gpt-oss-120b",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,

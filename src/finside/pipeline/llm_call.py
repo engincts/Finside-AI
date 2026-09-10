@@ -6,7 +6,22 @@ from config import Config
 from finside.loaders import PromptLoader
 from finside.providers import ProviderFactory
 from finside.pipeline.state import TraceKaydi
-from finside.models import BDRRiskAnalysisReport
+from finside.models import BDRRiskAnalysisReport, KomiteKararEgilimi
+
+
+def _hata_raporu(reason: str) -> BDRRiskAnalysisReport:
+    """LLM çağrısı başarısızsa: uydurma firma/risk verisi DEĞİL, boş + hatayı taşıyan rapor.
+    Downstream `is_mock_fallback` bayrağıyla bu adımı güvenilmez sayar."""
+    return BDRRiskAnalysisReport(
+        is_mock_fallback=True,
+        fallback_reason=reason,
+        firma_adi=None,
+        rapor_donemi=None,
+        denetci_gorusu=None,
+        karar_egilimi=KomiteKararEgilimi.BELIRSIZ,
+        genel_kredi_risk_ozeti=f"LLM çağrısı başarısız: {reason}",
+        analist_gerekce_metni=f"LLM çağrısı başarısız: {reason}",
+    )
 
 
 @dataclass
@@ -74,7 +89,7 @@ def rapor_cagrisi(
     try:
         report = provider.analyze(user_prompt)
     except Exception as err:
-        report = provider.generate_mock_report(user_prompt, is_fallback=True, reason=str(err))
+        report = _hata_raporu(str(err))
     elapsed = round(time.perf_counter() - start, 3)
 
     trace = _trace(
