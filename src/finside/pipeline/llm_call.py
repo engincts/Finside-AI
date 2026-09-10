@@ -10,7 +10,11 @@ from finside.models import BDRRiskAnalysisReport, KomiteKararEgilimi
 
 _T = TypeVar("_T")
 # Geçici HF/API kesintileri (503, timeout, "yanıt alınamadı") için artan beklemeli retry.
-_RETRY_BEKLEME_SN = (0.0, 4.0, 10.0)
+_RETRY_BEKLEME_SN = (0.0, 2.0, 5.0)
+# Devre kesici: bir model üst üste bu kadar hata verirse, bu process ömrü boyunca
+# o modeli atlayıp doğrudan yedeğe git (uzun kesintide her çağrıda retry israfını önler).
+_DEVRE_ESIGI = 3
+_ardisik_hata: dict = {}
 
 
 def _deneme_ile(fn: Callable[[], _T]) -> _T:
@@ -23,6 +27,10 @@ def _deneme_ile(fn: Callable[[], _T]) -> _T:
         except Exception as err:  # noqa: BLE001 — son deneme de düşerse yeniden fırlatılır
             son_hata = err
     raise son_hata  # type: ignore[misc]
+
+
+def _devre_acik(model_id: str) -> bool:
+    return _ardisik_hata.get(model_id, 0) >= _DEVRE_ESIGI
 
 
 def _hata_raporu(reason: str) -> BDRRiskAnalysisReport:
@@ -102,24 +110,36 @@ def rapor_cagrisi(
         )
         return _deneme_ile(lambda: provider.analyze(user_prompt))
 
+    yedek_id = Config.get_pipeline_config().get("fallback_model")
+    yedek_cfg = Config.get_model_config_by_id(yedek_id) if yedek_id and yedek_id != model_id else None
+
     provider_name = model_cfg.get("provider", "mock")
     kullanilan_id = model_id
     start = time.perf_counter()
-    try:
-        report = _uret(model_cfg)
-    except Exception as err:
-        # Retry'lar tükendi — farklı sağlayıcıdaki yedek modele geç (config.pipeline.fallback_model).
-        yedek_id = Config.get_pipeline_config().get("fallback_model")
-        yedek_cfg = Config.get_model_config_by_id(yedek_id) if yedek_id and yedek_id != model_id else None
-        if yedek_cfg:
-            try:
-                report = _uret(yedek_cfg)
-                kullanilan_id = f"{yedek_id} (yedek; {model_id} başarısız)"
-                provider_name = yedek_cfg.get("provider", "mock")
-            except Exception as yedek_err:
-                report = _hata_raporu(f"{err} | yedek {yedek_id}: {yedek_err}")
-        else:
-            report = _hata_raporu(str(err))
+
+    # Devre kesici açıksa primary'yi hiç deneme, doğrudan yedeğe git.
+    if _devre_acik(model_id) and yedek_cfg:
+        try:
+            report = _uret(yedek_cfg)
+            kullanilan_id = f"{yedek_id} (yedek; {model_id} devre kesici açık)"
+            provider_name = yedek_cfg.get("provider", "mock")
+        except Exception as yedek_err:  # noqa: BLE001
+            report = _hata_raporu(f"devre kesici + yedek {yedek_id} de düştü: {yedek_err}")
+    else:
+        try:
+            report = _uret(model_cfg)
+            _ardisik_hata[model_id] = 0
+        except Exception as err:  # noqa: BLE001
+            _ardisik_hata[model_id] = _ardisik_hata.get(model_id, 0) + 1
+            if yedek_cfg:
+                try:
+                    report = _uret(yedek_cfg)
+                    kullanilan_id = f"{yedek_id} (yedek; {model_id} başarısız)"
+                    provider_name = yedek_cfg.get("provider", "mock")
+                except Exception as yedek_err:  # noqa: BLE001
+                    report = _hata_raporu(f"{err} | yedek {yedek_id}: {yedek_err}")
+            else:
+                report = _hata_raporu(str(err))
     elapsed = round(time.perf_counter() - start, 3)
 
     trace = _trace(
