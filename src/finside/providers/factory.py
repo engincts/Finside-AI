@@ -4,6 +4,7 @@ from finside.providers.gemini_provider import GeminiProvider
 from finside.providers.openai_provider import OpenAIProvider
 from finside.providers.anthropic_provider import AnthropicProvider
 from finside.providers.huggingface_provider import HuggingFaceProvider
+from finside.providers.openrouter_provider import OpenRouterProvider
 from finside.providers.mock_provider import MockProvider
 
 
@@ -15,6 +16,7 @@ class ProviderFactory:
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,
         "huggingface": HuggingFaceProvider,
+        "openrouter": OpenRouterProvider,
         "mock": MockProvider
     }
 

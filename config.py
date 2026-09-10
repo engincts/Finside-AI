@@ -10,14 +10,14 @@ load_dotenv(BASE_DIR / ".env")
 CONFIG_JSON_PATH = BASE_DIR / "config.json"
 
 PIPELINE_DEFAULTS: Dict[str, Any] = {
-    "map_models": ["gpt-oss-120b"],
-    "triage_model": "gpt-oss-120b",
-    "reconciler_model": "gpt-oss-120b",
-    "critic_model": "gpt-oss-120b",
-    "sanitizer_model": "gpt-oss-120b",
-    "synthesis_model": "gpt-oss-120b",
-    "segmenter_fallback_model": "gpt-oss-120b",
-    "fallback_model": "gpt-4o",
+    "map_models": ["gpt-4o"],
+    "triage_model": "gpt-4o-mini",
+    "reconciler_model": "gpt-4o",
+    "critic_model": "gpt-4o",
+    "sanitizer_model": "gpt-4o-mini",
+    "synthesis_model": "gpt-4o",
+    "segmenter_fallback_model": "gpt-4o",
+    "fallback_model": "or-gpt-oss-120b",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,
@@ -49,6 +49,7 @@ class Config:
 
     PROVIDER_INPUT_LIMITS: Dict[str, int] = {
         "huggingface": 250_000,
+        "openrouter": 350_000,
         "openai": 480_000,
         "anthropic": 760_000,
         "gemini": 3_800_000,
