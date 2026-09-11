@@ -152,7 +152,7 @@ def qa_kontrol(state: PipelineState) -> dict:
     session_dir = Path(state["session_dir"])
     from finside.report_md import report_to_markdown
 
-    md_content = report_to_markdown(nihai)
+    md_content = report_to_markdown(nihai, is_pipeline=True)
     ReportWriter.save_final_report(session_dir, nihai, md_content)
     ReportWriter.save_trace(session_dir, state.get("trace", []))
 

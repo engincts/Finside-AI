@@ -383,7 +383,7 @@ def render_pipeline_report_tab():
     c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
 
     try:
-        _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"))
+        _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"), is_pipeline=True)
     except Exception:
         _md = None
 

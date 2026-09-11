@@ -117,7 +117,7 @@ def calistir_batch(
                 from finside.report_md import report_to_markdown
 
                 report = BDRRiskAnalysisReport.model_validate(nihai)
-                md_content = report_to_markdown(report)
+                md_content = report_to_markdown(report, is_pipeline=True)
                 ReportWriter.save_final_report(session_dir, report, md_content)
 
             maliyet = state.get("maliyet_ozeti") or {}
