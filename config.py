@@ -77,12 +77,18 @@ class Config:
     }
 
     _config_data: Optional[Dict[str, Any]] = None
+    _config_mtime: Optional[float] = None
 
     @classmethod
     def load_config(cls, force_reload: bool = False) -> Dict[str, Any]:
-        if cls._config_data is None or force_reload:
+        # Streamlit gibi uzun ömürlü process'lerde config.json elle düzenlenip kaydedilince
+        # dosya mtime'ı değişmiş olur — reload'u tetikler, aksi halde ilk açılıştaki config
+        # process ömrü boyunca önbellekte kalır (restart olmadan değişiklik görünmez).
+        mtime = CONFIG_JSON_PATH.stat().st_mtime
+        if cls._config_data is None or force_reload or mtime != cls._config_mtime:
             with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
                 cls._config_data = json.load(f)
+            cls._config_mtime = mtime
         return cls._config_data
 
     @classmethod
