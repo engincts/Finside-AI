@@ -217,7 +217,6 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
 
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
-    pipeline_cfg = config_data.get("pipeline", {})
     bdr_karakter = len(bdr_content)
     _deg = {m["id"]: Config.model_bdr_degerlendirmesi(m, bdr_karakter) for m in all_models if m.get("id")}
     _ad = {m["id"]: m.get("name", m["id"]) for m in all_models if m.get("id")}
@@ -226,13 +225,12 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         return f"{_deg[mid]['rozet']} {_ad.get(mid, mid)} — {_deg[mid]['ozet']}"
 
     model_secenekleri = [mid for mid in _deg if _deg[mid]["secilebilir"]]
-    varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
     secili_ensemble = st.multiselect(
         f"Ensemble Map Modelleri (Eşzamanlı Taramayı Yapacak AI Modelleri)  ·  BDR ~{bdr_karakter // 1000}k karakter",
         options=model_secenekleri,
-        default=varsayilan_ensemble or model_secenekleri[:1],
+        default=[],
         format_func=_model_etiketi,
-        help="Bu alanda işaretlediğiniz tüm modeller BDR metnini eşzamanlı olarak tarar. config.json dosyasındaki 'map_models' yalnızca ilk varsayılan seçimdir; buradan yaptığınız seçim geçerli olur."
+        help="Hiçbir model başta seçili gelmez — her çalıştırmada burada kendiniz seçersiniz. İşaretlediğiniz tüm modeller BDR metnini eşzamanlı olarak tarar."
     )
     st.info("💡 **Bilgi:** Burada seçtiğiniz modeller `Ensemble Map` aşamasında BDR parçalarını eşzamanlı tarar. Uzlaştırma, Critic ve Sentez rollerini aşağıdan özelleştirebilirsiniz.")
 
@@ -240,19 +238,14 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         for uyari in _deg[mid]["uyarilar"]:
             st.caption(f"⚠️ {_ad.get(mid, mid)}: {uyari}")
 
-    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
-        st.caption("Triyaj, Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
-        t_idx = model_secenekleri.index(pipeline_cfg.get("triage_model")) if pipeline_cfg.get("triage_model") in model_secenekleri else 0
-        r_idx = model_secenekleri.index(pipeline_cfg.get("reconciler_model")) if pipeline_cfg.get("reconciler_model") in model_secenekleri else 0
-        c_idx = model_secenekleri.index(pipeline_cfg.get("critic_model")) if pipeline_cfg.get("critic_model") in model_secenekleri else 0
-        san_default = pipeline_cfg.get("sanitizer_model", pipeline_cfg.get("critic_model"))
-        san_idx = model_secenekleri.index(san_default) if san_default in model_secenekleri else 0
-        s_idx = model_secenekleri.index(pipeline_cfg.get("synthesis_model")) if pipeline_cfg.get("synthesis_model") in model_secenekleri else 0
+    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)", expanded=True):
+        st.caption("Hiçbir rol başta seçili gelmez — pipeline'ı başlatmadan önce hepsini kendiniz seçmelisiniz:")
 
         pipe_triage = st.selectbox(
             "🎯 Triyaj (Triage) Modeli",
             options=model_secenekleri,
-            index=t_idx,
+            index=None,
+            placeholder="Model seçin",
             format_func=_model_etiketi,
             help="200+ sayfalık BDR metin parçalarını hızla tarayarak kredi riski taşıma ihtimali yüksek kilit dipnotları önceliklendirir."
         )
@@ -261,7 +254,8 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_reconciler = st.selectbox(
             "🤝 Uzlaştırma (Reconciler) Modeli",
             options=model_secenekleri,
-            index=r_idx,
+            index=None,
+            placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Ensemble modellerinden gelen ham risk bulgularını eşleştirir, tekrarları eler ve çelişkileri uzlaştırır."
         )
@@ -270,7 +264,8 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_critic = st.selectbox(
             "🕵️ Eleştirmen (Critic) Modeli",
             options=model_secenekleri,
-            index=c_idx,
+            index=None,
+            placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Uzlaştırılmış bulguları BDR dipnot metinleriyle çapraz denetler; halüsinasyon ve asılsız iddiaları eler."
         )
@@ -279,7 +274,8 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_sanitizer = st.selectbox(
             "🧹 Temizlik (Sanitizer) Modeli",
             options=model_secenekleri,
-            index=san_idx,
+            index=None,
+            placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Jenerik etki cümlelerini ve risk mekanizması içermeyen yalın bilanço kalemlerini süzen hızlı filtre ajanı."
         )
@@ -288,30 +284,37 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_synthesis = st.selectbox(
             "🧩 Sentez (Synthesis) Modeli",
             options=model_secenekleri,
-            index=s_idx,
+            index=None,
+            placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Tüm onaylı riskleri, finansal rasyoları ve denetçi görüşünü birleştirerek nihai kredilendirme raporunu oluşturur."
         )
         st.caption("💡 **Sentez Ajanı:** Doğrulanmış tüm bulguları ve rasyoları konsolide edip Kredi Komite Raporunu ve Karar Eğilimini yazar.")
 
-        # Config pipeline ayarlarını oturum içi dinamik güncelle
-        Config.update_pipeline_config(
-            triage=pipe_triage,
-            reconciler=pipe_reconciler,
-            critic=pipe_critic,
-            sanitizer=pipe_sanitizer,
-            synthesis=pipe_synthesis,
-        )
+        roller_tam = all((pipe_triage, pipe_reconciler, pipe_critic, pipe_sanitizer, pipe_synthesis))
+        if not roller_tam:
+            st.warning("⚠️ Pipeline'ı başlatmadan önce yukarıdaki 5 rolün tamamını seçmelisiniz.")
+
+        # Config pipeline ayarlarını oturum içi dinamik güncelle (yalnızca hepsi seçiliyse)
+        if roller_tam:
+            Config.update_pipeline_config(
+                triage=pipe_triage,
+                reconciler=pipe_reconciler,
+                critic=pipe_critic,
+                sanitizer=pipe_sanitizer,
+                synthesis=pipe_synthesis,
+            )
 
 
     maliyet_onay = st.checkbox("Yüksek token maliyetini anladım, pipeline'ı çalıştır")
+    calistirilabilir = maliyet_onay and bool(secili_ensemble) and roller_tam
 
     try:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not maliyet_onay)
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not calistirilabilir)
     except TypeError:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not maliyet_onay)
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not calistirilabilir)
 
-    if pipeline_btn and secili_ensemble:
+    if pipeline_btn and calistirilabilir:
         pipe_session_dir, _ = ReportWriter.create_session_directory(bdr_name)
         pipe_graph = build_graph(checkpointer=MemorySaver())
         pipe_baslangic = {

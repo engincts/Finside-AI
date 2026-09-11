@@ -98,9 +98,11 @@ def render_sidebar() -> SidebarState:
             provider = m.get("provider", "")
             deg = Config.model_bdr_degerlendirmesi(m, bdr_karakter)
 
+            # Config'deki 'enabled' bayrağı burada kasıtlı olarak yok sayılır — hiçbir
+            # model başta seçili gelmez, her çalıştırmada kullanıcı kendisi seçer.
             secildi = st.checkbox(
                 f"{deg['rozet']} {model_name}",
-                value=m.get("enabled", False),
+                value=False,
                 key=f"chk_{model_id}",
             )
 
