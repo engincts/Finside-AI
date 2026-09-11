@@ -66,6 +66,23 @@ Aşağıdaki 3 kategoriye giren hususlar metinde/dipnotlarda mevcutsa, tutar kü
 2. **İç Kontrol Eksiklikleri / Zafiyetleri ve KAM**: Denetim raporunda açıklanan iç kontrol bulguları, zafiyetler ve Kilit Denetim Konuları (KAM - Hasılat kaydı, topluluk denetimi vb.).
 3. **Faaliyet Sürekliliği (Going Concern) ve Bilanço Sonrası Olaylar**: Faaliyet sürekliliğine ilişkin belirsizlikler, sermaye değişimleri ve bilanço tarihinden sonraki önemli gelişmeler.
 
+⚠️ DENETÇİ STANDART METNİ TUZAĞI (yukarıdaki 2 ve 3'ü nitelendirir — YANLIŞ POZİTİF ÜRETME):
+Her BDR'de "Bağımsız Denetçinin Sorumlulukları" bölümü, denetçinin YÖNTEMİNİ anlatan
+DEĞİŞMEZ şablon metin içerir. Bu ifadeler bir BULGU DEĞİLDİR, ayrı risk kalemi AÇMA:
+- "...sürekliliğini devam ettirme kabiliyetine ilişkin ciddi şüphe oluşturabilecek olay
+  veya şartlarla ilgili önemli bir belirsizliğin mevcut olup olmadığı hakkında ... sonuca varırız"
+  → bu denetçinin görevi; going-concern SORUNU DEĞİL.
+- "...tespit ettiğimiz önemli iç kontrol eksiklikleri dâhil olmak üzere ... üst yönetime bildirmekteyiz"
+  → bu denetçinin bildirim görevi; raporlanmış bir zafiyet DEĞİL.
+- "makul güvence", "önemli yanlışlık", "hata veya hile" → standart metodoloji.
+
+GERÇEK going-concern riski YALNIZCA şu varsa: ayrı başlıklı "İşletmenin Sürekliliğiyle
+İlgili Önemli Belirsizlik" paragrafı, VEYA denetçi görüşü olumlu değil (şartlı/olumsuz/
+kaçınma), VEYA dikkat çekilen husus (emphasis of matter) paragrafı. Bunlar yoksa
+going-concern kalemi ÜRETME; ürettiysen `risk_derecesi` en fazla "Düşük".
+GERÇEK iç kontrol riski YALNIZCA: yönetim/denetçi tarafından SPESİFİK olarak tanımlanmış
+bir eksiklik (hangi süreç, hangi etki). Genel bildirim cümlesi → kalem AÇMA.
+
 DOĞRULUK VE KAPSAMLILIK İLKELERİ:
 - **Alıntı Zorunluluğu**: `kaynak_metin_alintisi` alanına yazdığın her metin, verilen BDR
   metninde BİREBİR (kelimesi kelimesine) geçmelidir. Parafraz, özet veya "muhtemelen

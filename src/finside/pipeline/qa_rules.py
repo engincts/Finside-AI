@@ -1,11 +1,41 @@
 """Faz 8 — Kural tabanlı tutarlılık kontrolü (LLM'siz son "akıl sağlığı" adımı)."""
 
+import re
 from typing import List
 
 from finside.models import BDRRiskAnalysisReport, DenetciGorusTuru, KomiteKararEgilimi, RiskDerecesi
 
 _DOGRULANMAMIS_ESIGI = 0.30
 _BOS_RISK_SEGMENT_ESIGI = 20
+# "Dipnot 25 - ...", "NOT 36 -", "Not.14 " gibi başlık önekleri — buradaki numara
+# bir tutar değil dipnot referansıdır, rakam-tutarsızlığı kontrolüne girmemeli.
+_DIPNOT_ONEK_RE = re.compile(r"^\s*(?:dipnot|not|note|md)\s*\.?\s*\d+\s*[-–—:.)]*\s*", re.IGNORECASE)
+
+# "4.58 Milyar", "225,1 Bin USD" gibi ölçek kelimeli tutarlar: buradaki "." ondalık
+# ayıraçtır (binlik değil) — büyük tam sayılarla (ör. detaydaki "4.575.746.000")
+# yuvarlama farkı içinde (±%2) karşılaştırmak için gerçek sayısal değere çevrilir.
+_OLCEK_CARPAN = {"bin": 1_000, "milyon": 1_000_000, "mn": 1_000_000, "milyar": 1_000_000_000, "mr": 1_000_000_000}
+_OLCEKLI_TUTAR_RE = re.compile(r"(\d{1,3}(?:[.,]\d{1,2})?)\s*(bin|milyon|mn\.?|milyar|mr\.?)\b", re.IGNORECASE)
+_TUTAR_TOLERANSI = 0.02
+
+
+def _olcekli_degerler(metin: str) -> set:
+    degerler: set = set()
+    for m in _OLCEKLI_TUTAR_RE.finditer(metin or ""):
+        sayi = float(m.group(1).replace(",", "."))
+        carpan = _OLCEK_CARPAN[m.group(2).lower().rstrip(".")]
+        degerler.add(round(sayi * carpan))
+    return degerler
+
+
+def _buyuklukce_yakin(hedef: int, kaynak_tam_sayilar: set) -> bool:
+    """`hedef` (ölçek kelimesinden hesaplanan gerçek değer), kaynaktaki tam sayılardan
+    biriyle (veya onun 'bin TL' cinsinden 1000 katıyla) ~%2 toleransla örtüşüyor mu."""
+    for k in kaynak_tam_sayilar:
+        for aday in (k, k * 1000):
+            if aday and abs(hedef - aday) / max(hedef, aday) <= _TUTAR_TOLERANSI:
+                return True
+    return False
 
 
 def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[str]:
@@ -76,16 +106,29 @@ def qa_bayraklari(report: BDRRiskAnalysisReport, segment_sayisi: int) -> List[st
             bul: set = set()
             for e in _SAYI_RE.findall(m or ""):
                 r = e.replace(".", "").replace(",", "")
-                if len(r) >= 2 and int(r) not in _YIL_ARALIGI:
+                if len(r) >= 3 and int(r) not in _YIL_ARALIGI:
                     bul.add(r)
             return bul
 
+        def _yaklasik_var(hedef: str, kaynak: set) -> bool:
+            # "33.34 Milyar" (başlıkta yuvarlanmış → "3334") ile "33.341.512" (detayda
+            # tam → "33341512") aynı büyüklüktür: biri diğerinin ilk hanelerinden oluşuyorsa eşleşmiş say.
+            return any(s == hedef or s.startswith(hedef) or hedef.startswith(s) for s in kaynak)
+
         for r in riskler:
-            baslik_sayilar = _tum_sayilar(r.baslik or "")
+            baslik_temiz = _DIPNOT_ONEK_RE.sub("", r.baslik or "")
+            baslik_sayilar = _tum_sayilar(baslik_temiz)
             if baslik_sayilar:
                 detay_sayilar = _tum_sayilar(f"{r.detay or ''} {r.tutar_bilgisi or ''}")
-                if detay_sayilar and not baslik_sayilar.intersection(detay_sayilar):
-                    # Başlıkta sayı var ama detayda/tutar_bilgisi'nde bu sayı HİÇ geçmiyor ve başka sayılar var
+                eslesmeyen = {b for b in baslik_sayilar if not _yaklasik_var(b, detay_sayilar)}
+                if eslesmeyen:
+                    olcekli = _olcekli_degerler(baslik_temiz)
+                    detay_tam = {int(s) for s in detay_sayilar}
+                    eslesmeyen = {
+                        b for b in eslesmeyen
+                        if not any(_buyuklukce_yakin(o, detay_tam) for o in olcekli)
+                    }
+                if detay_sayilar and eslesmeyen == baslik_sayilar:
                     bayraklar.append(
                         f"RAKAM-TUTARSIZLIĞI: '{r.baslik[:45]}' kaleminde başlıkta geçen sayı ({', '.join(sorted(baslik_sayilar))}) "
                         f"detay metninde ({', '.join(sorted(detay_sayilar))}) doğrulanamadı veya çelişiyor."

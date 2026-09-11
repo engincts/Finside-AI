@@ -15,9 +15,28 @@ from finside.pipeline.qa_rules import qa_bayraklari
 from finside.pipeline.sanitizer import riskleri_temizle
 from finside.pipeline.state import PipelineState
 from finside.writers import ReportWriter
-from finside.models import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru
+from finside.models import BDRRiskAnalysisReport, BDRRiskItem, DenetciGorusTuru, FinansalRasyoOzeti
 
 _KUNYE_ALANLARI = ("firma_adi", "rapor_donemi", "denetim_firmasi", "denetci_gorusu")
+_NET_DOVIZ_IPUCLARI = ("net yabancı para pozisyon", "net döviz pozisyon", "net yabanci para pozisyon")
+
+
+def _rasyo_ozeti(llm_rasyo, riskler: List[dict]):
+    """`net_doviz_pozisyonu`'nu LLM'in tahminine bırakmak yerine, risk listesindeki
+    'Net Yabancı Para Pozisyonu' kaleminin tutar_bilgisi'nden deterministik al (izlenebilir).
+    Diğer alanlar LLM'den geldiği gibi kalır."""
+    net_doviz = None
+    for r in riskler:
+        baslik = (r.get("baslik") or "").lower()
+        if any(ip in baslik for ip in _NET_DOVIZ_IPUCLARI) and r.get("tutar_bilgisi"):
+            net_doviz = str(r["tutar_bilgisi"])
+            break
+    if llm_rasyo is None and net_doviz is None:
+        return None
+    veri = llm_rasyo.model_dump() if llm_rasyo else {}
+    if net_doviz:
+        veri["net_doviz_pozisyonu"] = net_doviz
+    return FinansalRasyoOzeti.model_validate(veri)
 _GORUS_TARAMA_KARAKTER = 12000  # "Görüş" bölümü BDR'nin başındadır
 _EMBED_ANAHTAR_ENV = "OPENAI_API_KEY"
 _DIGER_KATEGORI = "Diğer Kalitatif Risk Unsuarları"
@@ -115,6 +134,7 @@ def sentezle(state: PipelineState) -> dict:
         denetim_firmasi=kunye.get("denetim_firmasi") or ust.denetim_firmasi,
         denetci_gorusu=kunye.get("denetci_gorusu") or (ust.denetci_gorusu.value if ust.denetci_gorusu else None),
         tespit_edilen_riskler=[BDRRiskItem.model_validate(r) for r in riskler],
+        finansal_rasyo_ozeti=_rasyo_ozeti(ust.finansal_rasyo_ozeti, riskler),
         genel_kredi_risk_ozeti=ust.genel_kredi_risk_ozeti,
         komite_tavsiyesi_ve_sartlar=ust.komite_tavsiyesi_ve_sartlar,
         karar_egilimi=ust.karar_egilimi,
@@ -132,7 +152,7 @@ def qa_kontrol(state: PipelineState) -> dict:
     session_dir = Path(state["session_dir"])
     from finside.report_md import report_to_markdown
 
-    md_content = report_to_markdown(nihai)
+    md_content = report_to_markdown(nihai, is_pipeline=True)
     ReportWriter.save_final_report(session_dir, nihai, md_content)
     ReportWriter.save_trace(session_dir, state.get("trace", []))
 

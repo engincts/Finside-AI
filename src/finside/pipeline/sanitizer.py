@@ -16,13 +16,26 @@ def riskleri_temizle(riskler: List[dict], model_id: str) -> Tuple[List[dict], Li
     sistem = (
         "Sen Kıdemli bir Kredi Risk Filtreleme ve Temizleme Ajanısın.\n"
         "Görevin: Verilen BDR kalitatif risk listesini inceleyip GERÇEK kredi riski taşıyan maddeleri korumak;\n"
-        "1. Hiçbir kısıt veya finansal tehdit taşımayan salt bilanço bakiyelerini (örn: 'Nakit ve Nakit Benzerleri', 'Sunuma İlişkin Esaslar') ELEMEK,\n"
-        "2. 'Borç ödeme kapasitesi üzerindeki olası etki' gibi jenerik/boş etki cümleli ve dipnotsuz jenerik tekrarları ELEMEK veya aynı kategorideki daha spesifik dipnot riskiyle BİRLEŞTİRMEKtir.\n"
-        "3. ZORUNLU KORUMA: Kilit Denetim Konuları (KAM), Bağımsız Denetçi Görüşü, İç Kontrol Zafiyetleri, Faaliyet Sürekliliği (Going Concern) ve İşletme Birleşmeleri (Berg EuroPipe/BMB Holding) gibi anlatı-tabanlı denetim bulgularını tutar rakamı içermese dahi KESİNLİKLE ELEME ve raporda KORU.\n"
+        "1. Hiçbir kısıt veya finansal tehdit taşımayan salt bilanço bakiyelerini (örn: 'Nakit ve Nakit Benzerleri', 'Sunuma İlişkin Esaslar') ELEMEK.\n"
+        "2. JENERİK ETKİ CÜMLESİ ZORUNLU DÜZELTME: `etki_degerlendirmesi` alanı "
+        "'Borç ödeme kapasitesi üzerindeki olası etki', 'nakit akışını etkileyebilir', "
+        "'finansal duruma yansır' gibi somut gerekçesi olmayan bir şablon cümleyse — kalemi "
+        "SİLME; o kalemin kendi `detay` + `tutar_bilgisi` + `dipnot_referansi` verisini "
+        "kullanarak etkiyi SOMUTLAŞTIR: hangi rasyoya (cari oran, net borç/FAVÖK, özkaynak), "
+        "hangi büyüklükte ve hangi mekanizmayla (teminat marjı daralması, kambiyo zararı, "
+        "kısa vade yoğunluğu, grup bulaşması vb.) bastığını 1-2 cümleyle yaz. "
+        "Somutlaştırmak için veri gerçekten yoksa ve kalem dipnotsuz bir tekrarsa, aynı "
+        "kategorideki spesifik dipnot kalemiyle BİRLEŞTİR.\n"
+        "3. ZORUNLU KORUMA: Kilit Denetim Konuları (KAM), Bağımsız Denetçi Görüşü, İç Kontrol Zafiyetleri, Faaliyet Sürekliliği (Going Concern) ve İşletme Birleşmeleri gibi anlatı-tabanlı denetim bulgularını tutar rakamı içermese dahi KESİNLİKLE ELEME ve raporda KORU.\n"
+        "Hiçbir kalemin `etki_degerlendirmesi` alanını şablon cümleyle bırakma. "
         "Sadece temizlenmiş ve süzülmüş nihai `tespit_edilen_riskler` listesini üret."
     )
 
-    user_prompt = f"Lütfen aşağıdaki risk listesini süzerek jenerik/sözde riskleri temizle:\n\n{json.dumps(riskler, ensure_ascii=False, indent=2)}"
+    user_prompt = (
+        "Aşağıdaki risk listesini süz: sözde riskleri ele, jenerik etki cümlelerini "
+        "kalemin kendi verisiyle somutlaştır.\n\n"
+        f"{json.dumps(riskler, ensure_ascii=False, indent=2)}"
+    )
 
     try:
         sonuc = rapor_cagrisi(

@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any, List
 import streamlit as st
 from langgraph.checkpoint.memory import MemorySaver
@@ -120,6 +121,11 @@ def render_prompt_tab():
     """Prompt Düzenleyici sekmesini çizer."""
     st.subheader("📝 Canlı Prompt Düzenleme & İnceleme Paneli")
     st.caption("Aşağıdaki alanlardan System Prompt ve User Prompt metinlerini canlı olarak düzenleyebilirsiniz:")
+    st.info(
+        "ℹ️ Buradaki canlı metin yalnızca **Model Kıyaslama** panelinde kullanılır. "
+        "**Multi-Agent Pipeline** her zaman diskteki `prompts/bdr_analyst_v1.md` dosyasını okur — "
+        "değişikliğin pipeline'a da yansıması için **'💾 1. Değişiklikleri Kaydet'** ile dosyaya yazmanız gerekir."
+    )
 
     # Dosyadaki mevcut halini oku (Senkronizasyon kontrolü için)
     target_prompt_file = Config.BASE_DIR / "prompts" / PROMPT_FILE_NAME
@@ -212,43 +218,46 @@ def render_input_tab(bdr_name: str, bdr_content: str):
 def render_pipeline_tab(bdr_name: str, bdr_content: str):
     """Multi-Agent Pipeline sekmesini çizer."""
     st.subheader("🔗 Multi-Agent BDR Analiz Pipeline")
-    st.caption("Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA.")
-    st.warning("Bu sekme Karşılaştırma Paneli'nden bağımsızdır.")
+    st.caption("Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA. Sol menüdeki Model Kıyaslama'dan bağımsız, kendi butonuyla çalışır.")
 
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
     pipeline_cfg = config_data.get("pipeline", {})
     bdr_karakter = len(bdr_content)
     _deg = {m["id"]: Config.model_bdr_degerlendirmesi(m, bdr_karakter) for m in all_models if m.get("id")}
+    _ad = {m["id"]: m.get("name", m["id"]) for m in all_models if m.get("id")}
+
+    def _model_etiketi(mid: str) -> str:
+        return f"{_deg[mid]['rozet']} {_ad.get(mid, mid)} — {_deg[mid]['ozet']}"
 
     model_secenekleri = [mid for mid in _deg if _deg[mid]["secilebilir"]]
     varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
     secili_ensemble = st.multiselect(
         f"Ensemble Map Modelleri (Eşzamanlı Taramayı Yapacak AI Modelleri)  ·  BDR ~{bdr_karakter // 1000}k karakter",
         options=model_secenekleri,
-        default=varsayilan_ensemble or model_secenekleri[:1],
-        format_func=lambda mid: f"{_deg[mid]['rozet']} {mid} — {_deg[mid]['ozet']}",
-        help="Bu alanda işaretlediğiniz tüm modeller BDR metnini eşzamanlı olarak tarar. config.json dosyasındaki 'map_models' yalnızca ilk varsayılan seçimdir; buradan yaptığınız seçim geçerli olur."
+        default=varsayilan_ensemble,
+        format_func=_model_etiketi,
+        help="Varsayılan seçim config.json → pipeline.map_models. Buradan değiştirebilir veya boşaltıp kendi seçiminizi yapabilirsiniz — boşsa pipeline başlatılamaz."
     )
     st.info("💡 **Bilgi:** Burada seçtiğiniz modeller `Ensemble Map` aşamasında BDR parçalarını eşzamanlı tarar. Uzlaştırma, Critic ve Sentez rollerini aşağıdan özelleştirebilirsiniz.")
 
     for mid in secili_ensemble:
         for uyari in _deg[mid]["uyarilar"]:
-            st.caption(f"⚠️ {mid}: {uyari}")
+            st.caption(f"⚠️ {_ad.get(mid, mid)}: {uyari}")
 
-    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
-        st.caption("Triyaj, Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
-        t_idx = model_secenekleri.index(pipeline_cfg.get("triage_model")) if pipeline_cfg.get("triage_model") in model_secenekleri else 0
-        r_idx = model_secenekleri.index(pipeline_cfg.get("reconciler_model")) if pipeline_cfg.get("reconciler_model") in model_secenekleri else 0
-        c_idx = model_secenekleri.index(pipeline_cfg.get("critic_model")) if pipeline_cfg.get("critic_model") in model_secenekleri else 0
-        san_default = pipeline_cfg.get("sanitizer_model", pipeline_cfg.get("critic_model"))
-        san_idx = model_secenekleri.index(san_default) if san_default in model_secenekleri else 0
-        s_idx = model_secenekleri.index(pipeline_cfg.get("synthesis_model")) if pipeline_cfg.get("synthesis_model") in model_secenekleri else 0
+    def _cfg_idx(rol: str) -> int | None:
+        deger = pipeline_cfg.get(rol)
+        return model_secenekleri.index(deger) if deger in model_secenekleri else None
+
+    with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)", expanded=True):
+        st.caption("Varsayılan seçim config.json → pipeline'daki role uygun model (rol başına en makul açık kaynak seçenek); istediğiniz gibi değiştirebilirsiniz.")
 
         pipe_triage = st.selectbox(
             "🎯 Triyaj (Triage) Modeli",
             options=model_secenekleri,
-            index=t_idx,
+            index=_cfg_idx("triage_model"),
+            placeholder="Model seçin",
+            format_func=_model_etiketi,
             help="200+ sayfalık BDR metin parçalarını hızla tarayarak kredi riski taşıma ihtimali yüksek kilit dipnotları önceliklendirir."
         )
         st.caption("💡 **Triyaj Ajanı:** BDR bölümlerini taranacaklar / elenecekler olarak hızlı ön sınıflandırmaya tabi tutar.")
@@ -256,7 +265,9 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_reconciler = st.selectbox(
             "🤝 Uzlaştırma (Reconciler) Modeli",
             options=model_secenekleri,
-            index=r_idx,
+            index=_cfg_idx("reconciler_model"),
+            placeholder="Model seçin",
+            format_func=_model_etiketi,
             help="Ensemble modellerinden gelen ham risk bulgularını eşleştirir, tekrarları eler ve çelişkileri uzlaştırır."
         )
         st.caption("💡 **Uzlaştırma Ajanı:** Farklı modellerin bulduğu ham riskleri anlamsal kümeleyip deduplikasyon yapar.")
@@ -264,7 +275,9 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_critic = st.selectbox(
             "🕵️ Eleştirmen (Critic) Modeli",
             options=model_secenekleri,
-            index=c_idx,
+            index=_cfg_idx("critic_model"),
+            placeholder="Model seçin",
+            format_func=_model_etiketi,
             help="Uzlaştırılmış bulguları BDR dipnot metinleriyle çapraz denetler; halüsinasyon ve asılsız iddiaları eler."
         )
         st.caption("💡 **Eleştirmen Ajanı:** Bulguları BDR orijinal metniyle grounding testine tabi tutar, kanıtsız riskleri geri çevirir.")
@@ -272,7 +285,9 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_sanitizer = st.selectbox(
             "🧹 Temizlik (Sanitizer) Modeli",
             options=model_secenekleri,
-            index=san_idx,
+            index=_cfg_idx("sanitizer_model"),
+            placeholder="Model seçin",
+            format_func=_model_etiketi,
             help="Jenerik etki cümlelerini ve risk mekanizması içermeyen yalın bilanço kalemlerini süzen hızlı filtre ajanı."
         )
         st.caption("💡 **Temizlik Ajanı:** Jenerik/şablon cümleleri somut etki analizleriyle günceller ve salt bilanço bakiyelerini rapordan temizler.")
@@ -280,29 +295,39 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_synthesis = st.selectbox(
             "🧩 Sentez (Synthesis) Modeli",
             options=model_secenekleri,
-            index=s_idx,
+            index=_cfg_idx("synthesis_model"),
+            placeholder="Model seçin",
+            format_func=_model_etiketi,
             help="Tüm onaylı riskleri, finansal rasyoları ve denetçi görüşünü birleştirerek nihai kredilendirme raporunu oluşturur."
         )
         st.caption("💡 **Sentez Ajanı:** Doğrulanmış tüm bulguları ve rasyoları konsolide edip Kredi Komite Raporunu ve Karar Eğilimini yazar.")
 
-        # Config pipeline ayarlarını oturum içi dinamik güncelle
-        Config.update_pipeline_config(
-            triage=pipe_triage,
-            reconciler=pipe_reconciler,
-            critic=pipe_critic,
-            sanitizer=pipe_sanitizer,
-            synthesis=pipe_synthesis,
-        )
+        roller_tam = all((pipe_triage, pipe_reconciler, pipe_critic, pipe_sanitizer, pipe_synthesis))
+        if not roller_tam:
+            st.warning("⚠️ Pipeline'ı başlatmadan önce yukarıdaki 5 rolün tamamını seçmelisiniz.")
+
+        # Config pipeline ayarlarını oturum içi dinamik güncelle (yalnızca hepsi seçiliyse)
+        if roller_tam:
+            Config.update_pipeline_config(
+                triage=pipe_triage,
+                reconciler=pipe_reconciler,
+                critic=pipe_critic,
+                sanitizer=pipe_sanitizer,
+                synthesis=pipe_synthesis,
+            )
 
 
     maliyet_onay = st.checkbox("Yüksek token maliyetini anladım, pipeline'ı çalıştır")
+    calistirilabilir = maliyet_onay and bool(secili_ensemble) and roller_tam
 
     try:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not maliyet_onay)
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", width="stretch", disabled=not calistirilabilir)
     except TypeError:
-        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not maliyet_onay)
+        pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not calistirilabilir)
 
-    if pipeline_btn and secili_ensemble:
+    st.caption("Sonuç hazır olunca **'🧩 Pipeline — Rapor'** sekmesinde görünür.")
+
+    if pipeline_btn and calistirilabilir:
         pipe_session_dir, _ = ReportWriter.create_session_directory(bdr_name)
         pipe_graph = build_graph(checkpointer=MemorySaver())
         pipe_baslangic = {
@@ -338,25 +363,45 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         nihai = (son_guncelleme.get("maliyet_ozetle") or {}).get("nihai_rapor") \
             or (son_guncelleme.get("qa_kontrol") or {}).get("nihai_rapor")
         st.session_state.pipeline_sonucu = {"nihai": nihai, "dizin": str(pipe_session_dir)}
-        st.success(f"✅ Pipeline tamamlandı: `{pipe_session_dir}`")
+        st.success(f"✅ Pipeline tamamlandı: `{pipe_session_dir}` — sonuç **'🧩 Pipeline — Rapor'** sekmesinde.")
 
+
+def render_pipeline_report_tab():
+    """Pipeline'ın ürettiği nihai raporu, Model Çıktı Raporları ile aynı düzende gösterir.
+    Yeniden pipeline çalıştırılana kadar (session_state) olduğu gibi durur."""
     pipe_sonuc = st.session_state.get("pipeline_sonucu")
-    if pipe_sonuc and pipe_sonuc.get("nihai"):
-        nr = pipe_sonuc["nihai"]
-        st.markdown("---")
-        c1, c2, c3 = st.columns(3)
-        c1.info(f"**Firma:** {nr.get('firma_adi')}")
-        c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or '—'}")
-        c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+    if not (pipe_sonuc and pipe_sonuc.get("nihai")):
+        st.info("👈 Henüz bir pipeline çalıştırılmadı. **'🔗 Pipeline — Çalıştır'** sekmesinden başlatabilirsiniz.")
+        return
 
-        try:
-            _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"))
-        except Exception:
-            _md = None
+    st.subheader("🧩 Multi-Agent Pipeline — Nihai Rapor")
+    nr = pipe_sonuc["nihai"]
 
+    c1, c2, c3 = st.columns(3)
+    c1.info(f"**Firma:** {nr.get('firma_adi')}")
+    c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or 'Belirtilmemiş'}")
+    c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+
+    try:
+        _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"), is_pipeline=True)
+    except Exception:
+        _md = None
+
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
         if _md:
-            st.download_button("⬇️ Nihai Raporu İndir (.md)", data=_md, file_name="nihai_rapor.md", mime="text/markdown")
-            with st.container(height=600):
-                st.markdown(_md)
-        with st.expander("Nihai rapor (JSON)"):
-            st.json(nr)
+            st.download_button("⬇️ Raporu İndir (.md)", data=_md, file_name="pipeline_nihai_rapor.md", mime="text/markdown")
+    with col_dl2:
+        st.download_button(
+            "⬇️ Ham Veriyi İndir (.json)",
+            data=json.dumps(nr, ensure_ascii=False, indent=2),
+            file_name="pipeline_nihai_rapor.json",
+            mime="application/json",
+        )
+
+    st.markdown("---")
+    if _md:
+        with st.container(height=600):
+            st.markdown(_md)
+    with st.expander("Nihai rapor (JSON)"):
+        st.json(nr)

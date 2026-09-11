@@ -2,7 +2,7 @@
 insanın anlayacağı, aşama aşama, gruplu/modelli bir rapora çevirir.
 
 Saf sunum katmanı: LLM/IO yok. `asama_ozeti` (Streamlit checklist) durumsuzdur;
-`ilerleme_takipcisi` (CLI akış logu) grup sayısı/model listesi gibi bağlamı biriktirir.
+`ilerleme_takipcisi` (CLI akış logu) faz başına tek satır özet yazar.
 """
 
 from typing import Callable, List
@@ -26,13 +26,20 @@ def _liste(guncelleme: dict, anahtar: str) -> list:
     return guncelleme.get(anahtar) or []
 
 
+def _ad(model_id: str) -> str:
+    """Ham config id'si ("or-gpt-oss-120b") yerine config.json'daki okunabilir
+    "name" alanını ("GPT-OSS-120B (OpenRouter)") döndürür."""
+    cfg = Config.get_model_config_by_id(model_id)
+    return cfg.get("name", model_id) if cfg else model_id
+
+
 def model_rolleri_satiri(map_modelleri: List[str]) -> str:
     pc = Config.get_pipeline_config()
     san_m = pc.get("sanitizer_model", pc.get("critic_model", "—"))
     return (
-        f"map (risk çıkarımı): {', '.join(map_modelleri) or '—'}  ·  "
-        f"triyaj: {pc['triage_model']}  ·  uzlaştırma: {pc['reconciler_model']}  ·  "
-        f"critic: {pc['critic_model']}  ·  sanitizer: {san_m}  ·  sentez: {pc['synthesis_model']}"
+        f"map (risk çıkarımı): {', '.join(_ad(m) for m in map_modelleri) or '—'}  ·  "
+        f"triyaj: {_ad(pc['triage_model'])}  ·  uzlaştırma: {_ad(pc['reconciler_model'])}  ·  "
+        f"critic: {_ad(pc['critic_model'])}  ·  sanitizer: {_ad(san_m)}  ·  sentez: {_ad(pc['synthesis_model'])}"
     )
 
 
@@ -91,39 +98,25 @@ def ilerleme_takipcisi(yaz: Callable[[str], None], map_modelleri: List[str]) -> 
 
     `yaz` tek bir satır yazar (örn. `print`). Dönen fonksiyon `(node, guncelleme)` alır.
     """
-    pc = Config.get_pipeline_config()
     n_model = max(len(map_modelleri), 1)
-    d = {"grup": 0, "map_bitti": 0, "map_toplam": 0, "grup_bitti": 0, "ham": 0}
-
-    def yaz_alt(metin: str) -> None:
-        yaz(f"     {metin}")
+    d = {"grup": 0, "map_bitti": 0, "map_toplam": 0, "ham": 0}
 
     def isle(node: str, u: dict) -> None:
         if node == "segmentle":
             segs = _liste(u, "segmentler")
-            yontem = u.get("segmentasyon_yontemi", "?")
-            nasil = "regex ile ayrıldı (LLM'e gerek kalmadı)" if yontem == "regex" \
-                else "regex güveni düşüktü → LLM ile bölündü"
-            yaz(f"▶ {FAZ_ETIKETLERI['segmentle']}")
-            yaz_alt(f"BDR {len(segs)} bölüme ayrıldı · {nasil} · güven %{round(100 * u.get('segmentasyon_guven', 0))}")
+            yaz(f"1 · Segmentasyon → {len(segs)} bölüm ({u.get('segmentasyon_yontemi', '?')}, "
+                f"güven %{round(100 * u.get('segmentasyon_guven', 0))})")
 
         elif node == "triyaj_yap":
             kararlar = _liste(u, "triaj_kararlari")
             dahil = len(_liste(u, "analiz_edilecek_sira_nolari"))
-            kural = sum(1 for k in kararlar if k.get("yontem") == "kural")
-            llm = sum(1 for k in kararlar if k.get("yontem") == "llm")
-            bp = sum(1 for k in kararlar if k.get("yontem") == "boilerplate")
-            yaz(f"▶ {FAZ_ETIKETLERI['triyaj_yap']}  (hangi bölümler kredi riski taşıyor?)")
-            yaz_alt(f"{len(kararlar)} bölüm tarandı → {dahil} analize alındı, {len(kararlar) - dahil} elendi")
-            yaz_alt(f"{kural} bölüm kural (anahtar kelime) · {llm} bölüm LLM ({pc['triage_model']}) · {bp} boilerplate")
+            yaz(f"2 · Triyaj → {dahil}/{len(kararlar)} bölüm analize alındı")
 
         elif node == "gruplari_olustur":
             gruplar = _liste(u, "segment_gruplari")
             d["grup"] = len(gruplar)
             d["map_toplam"] = len(gruplar) * n_model
-            yaz(f"▶ {FAZ_ETIKETLERI['gruplari_olustur']}")
-            yaz_alt(f"analize alınan bölümler {len(gruplar)} gruba paketlendi (LLM bağlam bütçesine göre)")
-            yaz(f"▶ {FAZ_ETIKETLERI['map_worker']}  —  {len(gruplar)} grup × {n_model} model = {d['map_toplam']} paralel çıkarım")
+            yaz(f"3 · Map → {len(gruplar)} grup × {n_model} model = {d['map_toplam']} çıkarım")
 
         elif node == "map_worker":
             for c in _liste(u, "map_ciktilari"):
@@ -132,54 +125,30 @@ def ilerleme_takipcisi(yaz: Callable[[str], None], map_modelleri: List[str]) -> 
                 d["ham"] += risk_n
                 gid = c.get("grup_id", 0) + 1
                 if c.get("hata_durumu"):
-                    yaz_alt(f"✗ grup {gid}/{d['grup']} · {c.get('model_id')} · HATA: {str(c['hata_durumu'])[:70]}")
+                    yaz(f"  ✗ grup {gid}/{d['grup']} · {c.get('model_id')} · {str(c['hata_durumu'])[:70]}")
                 else:
-                    yaz_alt(f"✓ grup {gid}/{d['grup']} · {c.get('model_id')} → {risk_n} ham risk ({c.get('sure_sn', 0):.1f}s)")
+                    yaz(f"  ✓ grup {gid}/{d['grup']} · {c.get('model_id')} → {risk_n} risk ({c.get('sure_sn', 0):.1f}s)")
             if d["map_toplam"] and d["map_bitti"] >= d["map_toplam"]:
-                yaz_alt(f"= toplam {d['ham']} ham risk çıkarıldı")
-
-        elif node == "map_topla":
-            yaz(f"▶ {FAZ_ETIKETLERI['map_topla']}")
-            yaz_alt("ham riskler tek havuzda toplandı, iz kaydı yazıldı")
-            yaz(f"▶ {FAZ_ETIKETLERI['grup_isle']}  —  {d['grup']} grup ayrı ayrı işleniyor")
-            yaz_alt("her grup: alıntı doğrulama → modelleri uzlaştırma → eksik tarama (critic)")
+                yaz(f"  = {d['ham']} ham risk")
 
         elif node == "grup_isle":
             riskler = _liste(u, "uzlastirilmis_riskler")
-            celiskiler = len(_liste(u, "celiskiler"))
-            for t in _liste(u, "critic_turlari"):
-                d["grup_bitti"] += 1
-                gid = t.get("grup_id", 0) + 1
-                yaz_alt(
-                    f"✓ grup {gid}/{d['grup']} → {len(riskler)} uzlaştırılmış risk · "
-                    f"critic +{t.get('son_eklenen', 0)} (tur {t.get('tur', 0)}) · {celiskiler} çelişki"
-                )
+            eklenen = sum(t.get("son_eklenen", 0) for t in _liste(u, "critic_turlari"))
+            yaz(f"4-6 · Grounding + Uzlaştırma + Critic → {len(riskler)} risk (critic +{eklenen})")
 
         elif node == "sentezle":
             nr = u.get("nihai_rapor") or {}
-            yaz(f"▶ {FAZ_ETIKETLERI['sentezle']}  (dedup + roll-up ele + kategori kurtar → nihai rapor)")
-            yaz_alt(f"{len(nr.get('tespit_edilen_riskler', []))} nihai risk kalemi")
-            yaz_alt(f"firma: {nr.get('firma_adi') or '—'} · dönem: {nr.get('rapor_donemi') or '—'} · görüş: {nr.get('denetci_gorusu') or '—'}")
+            yaz(f"6.5-7 · Sentez → {len(nr.get('tespit_edilen_riskler', []))} nihai risk · "
+                f"{nr.get('firma_adi') or '—'}")
 
         elif node == "qa_kontrol":
             b = _liste(u, "qa_bayraklari")
-            yaz(f"▶ {FAZ_ETIKETLERI['qa_kontrol']}")
-            yaz_alt("✓ temiz — hiçbir tutarsızlık bayrağı yok" if not b
-                    else f"⚠ {len(b)} bayrak → " + "  ||  ".join(b))
+            yaz("8 · QA → temiz" if not b else f"8 · QA → {len(b)} bayrak: " + " | ".join(b))
 
         elif node == "maliyet_ozetle":
             m = u.get("maliyet_ozeti") or {}
-            kir = m.get("asama_kirilimi") or {}
-            basarisiz = m.get('basarisiz_cagri', 0)
-            yaz(f"▶ {FAZ_ETIKETLERI['maliyet_ozetle']}")
-            yaz_alt(
-                f"{m.get('toplam_llm_cagrisi', 0)} LLM çağrısı · {basarisiz} başarısız/retry · "
-                f"{m.get('toplam_sure_sn', 0)}s · ~${m.get('tahmini_usd', 0)}"
-            )
-            if basarisiz > 0:
-                yaz_alt("ℹ️ (başarısız denemeler: sunucu cold-start/timeout sonrası retry ile çözülmüş self-healing denemelerdir)")
-            if kir:
-                yaz_alt("aşama kırılımı: " + " · ".join(f"{k}={v}" for k, v in kir.items()))
+            yaz(f"10 · Maliyet → {m.get('toplam_llm_cagrisi', 0)} çağrı · "
+                f"{m.get('toplam_sure_sn', 0)}s · ~${m.get('tahmini_usd', 0)}")
 
     return isle
 

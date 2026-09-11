@@ -69,6 +69,9 @@ BOILERPLATE_IBARELERI = [
     "raporlama para birimi", "konsolidasyon esasları", "içindekiler",
     "işletmenin organizasyonu", "grup'un yapısı", "faaliyet konusu",
     "finansal tabloların onaylanması", "bölümlere göre raporlama",
+    # Denetçinin yöntemini anlatan değişmez şablon bölüm — bulgu içermez, yanlış
+    # pozitif going-concern / iç kontrol riski kaynağı (bkz. bdr_analyst_v1.md tuzak notu).
+    "denetçinin sorumlulukları", "denetçinin bağımsız denetime ilişkin sorumlulukları",
 ]
 
 

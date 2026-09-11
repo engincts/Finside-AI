@@ -11,16 +11,7 @@ except ImportError:
 
 
 class HuggingFaceProvider(BaseProvider):
-    """HuggingFace Inference API entegrasyon sağlayıcısı (Çok Seviyeli Esnek Fallback Destekli)."""
-
-    # HF Serverless Router üzerinde 7/24 %100 aktif olarak barındırılan lider açık kaynak modeller
-    FALLBACK_MODELS = [
-        "Qwen/Qwen2.5-72B-Instruct",
-        "meta-llama/Llama-3.3-70B-Instruct",
-        "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        "mistralai/Mistral-Small-24B-Instruct-2501",
-        "google/gemma-2-27b-it"
-    ]
+    """HuggingFace Inference API entegrasyon sağlayıcısı (chat streaming → non-stream → text-generation)."""
 
     def analyze(self, user_prompt: str) -> BDRRiskAnalysisReport:
         if not self.api_key:
@@ -91,29 +82,10 @@ class HuggingFaceProvider(BaseProvider):
                 except Exception:
                     pass
 
-            # 4. Deneme: Yüksek Performanslı Serverless Fallback Modelleri
-            if not raw_text:
-                for fb_model in self.FALLBACK_MODELS:
-                    if fb_model == self.model_name:
-                        continue
-                    try:
-                        fb_client = InferenceClient(model=fb_model, token=self.api_key)
-                        comp = fb_client.chat.completions.create(
-                            messages=[
-                                {"role": "system", "content": strict_system_prompt},
-                                {"role": "user", "content": user_prompt}
-                            ],
-                            max_tokens=self.max_tokens,
-                            temperature=self.temperature,
-                            top_p=self.top_p,
-                            stream=False,
-                        )
-                        if comp and comp.choices and comp.choices[0].message:
-                            raw_text = comp.choices[0].message.content
-                            if raw_text:
-                                break
-                    except Exception:
-                        continue
+            # NOT: Model-içi FALLBACK_MODELS zinciri kaldırıldı — yavaş (25-36s) ve zayıf
+            # sonuç veren başka bir HF modeline "başarıyla" düşüp gerçek hatayı maskeliyordu.
+            # Artık temiz exception atılıyor; sağlayıcı-ötesi yedek (config.pipeline.fallback_model,
+            # örn. gpt-4o) llm_call katmanında devreye giriyor.
 
             if raw_text and raw_text.strip():
                 report = self._parse_report(raw_text)

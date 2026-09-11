@@ -26,14 +26,15 @@ def _checkpointer() -> Tuple[object, Optional[object]]:
             from langgraph.checkpoint.postgres import PostgresSaver
 
             if "connect_timeout" not in url:
-                url += ("&" if "?" in url else "?") + "connect_timeout=5"
+                url += ("&" if "?" in url else "?") + "connect_timeout=2"
             ctx = PostgresSaver.from_conn_string(url)
             saver = ctx.__enter__()
             saver.setup()
             return saver, ctx
         except Exception as exc:  # noqa: BLE001 — Postgres yoksa geliştirme durmasın
+            ozet = str(exc).splitlines()[0][:120]
             warnings.warn(
-                f"Postgres checkpointer kurulamadı ({exc}); MemorySaver'a düşülüyor.",
+                f"Postgres checkpointer kurulamadı ({ozet}); MemorySaver — batch resume kalıcı değil.",
                 stacklevel=2,
             )
     else:
@@ -104,10 +105,8 @@ def calistir_batch(
 
             takipci = None
             if yaz is not None:
-                yaz("═" * 78)
-                yaz(f"📄 BDR: {dosya.name}  ({bilgi['character_count']:,} karakter)".replace(",", "."))
-                yaz(f"   Modeller — {model_rolleri_satiri(etkili_modeller)}")
-                yaz("═" * 78)
+                yaz(f"\nBDR: {dosya.name} ({bilgi['character_count']:,} karakter)".replace(",", "."))
+                yaz(f"Modeller — {model_rolleri_satiri(etkili_modeller)}")
                 takipci = ilerleme_takipcisi(yaz, etkili_modeller)
 
             state = _bdr_calistir(bilgi, dosya, session_dir, secili_modeller, graph, takipci)
@@ -118,7 +117,7 @@ def calistir_batch(
                 from finside.report_md import report_to_markdown
 
                 report = BDRRiskAnalysisReport.model_validate(nihai)
-                md_content = report_to_markdown(report)
+                md_content = report_to_markdown(report, is_pipeline=True)
                 ReportWriter.save_final_report(session_dir, report, md_content)
 
             maliyet = state.get("maliyet_ozeti") or {}

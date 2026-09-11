@@ -54,7 +54,7 @@ def maliyet_ozetle(state: PipelineState) -> dict:
         f"**Genel Karar Eğilimi:** `{rapor.karar_egilimi.value}`",
     ]
     (session_dir / "nihai_rapor.md").write_text(
-        report_to_markdown(rapor, ust_satirlar=ust, pipeline_izi=izi), encoding="utf-8"
+        report_to_markdown(rapor, ust_satirlar=ust, pipeline_izi=izi, is_pipeline=True), encoding="utf-8"
     )
 
     return {"nihai_rapor": nihai, "maliyet_ozeti": izi}

@@ -23,9 +23,13 @@ class OpenAIProvider(BaseProvider):
         if not HAS_OPENAI:
             raise RuntimeError("❌ openai paketi yüklü değil. Lütfen `pip install openai` çalıştırın.")
 
+        # gpt-4o context ~128K token (~450K karakter). Rate limit'e takılırsa aşağıdaki
+        # except bloğu 15K'ya düşürüp yeniden dener — burada peşinen kırpmıyoruz (kırpma
+        # map çıkarımında bölümün 2/3'ünü kör ediyordu).
         active_user_prompt = user_prompt
-        if len(user_prompt) > 30000 and "gpt-4o" in self.model_name and "mini" not in self.model_name:
-            active_user_prompt = user_prompt[:30000] + "\n\n[UYARI: Metin OpenAI Tier 1 (10K TPM) limitine takılmamak için ilk 30.000 karakter ile sınırlandırılmıştır.]"
+        _KIRP = 380_000
+        if len(user_prompt) > _KIRP and "gpt-4o" in self.model_name and "mini" not in self.model_name:
+            active_user_prompt = user_prompt[:_KIRP] + "\n\n[UYARI: Metin gpt-4o context sınırına göre ilk 380.000 karakter ile sınırlandırılmıştır.]"
 
         try:
             client = OpenAI(api_key=self.api_key)

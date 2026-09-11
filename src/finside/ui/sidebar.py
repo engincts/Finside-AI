@@ -28,7 +28,7 @@ def render_sidebar() -> SidebarState:
 
     st.sidebar.image("https://img.icons8.com/color/96/000000/bank-building.png", width=65)
     st.sidebar.title("⚙️ Kontrol Paneli")
-    st.sidebar.caption("💡 Kolay Analiz: Sırasıyla 1. ve 2. adımları seçip **🚀 ANALİZİ BAŞLAT** butonuna basın.")
+    st.sidebar.caption("💡 Bu panel **Model Kıyaslama**dır (her modeli tek başına çalıştırır). Çok-ajanlı akış için **Pipeline** sekmelerini kullanın.")
 
     st.sidebar.markdown("---")
 
@@ -75,16 +75,18 @@ def render_sidebar() -> SidebarState:
         f"📊 **BDR Hacmi:** {bdr_karakter:,} Karakter · {bdr_kelime:,} Kelime (`~{bdr_token:,} Token`)"
     )
 
-    # Modelleri Kategorilere Ayırma
+    # Modelleri Kategorilere Ayırma (provider'a göre — her model tam olarak tek sekmede görünür)
     embedder_models = [m for m in all_models if "embedding" in m.get("id", "") or "embed" in m.get("id", "")]
     kloudeks_models = [m for m in all_models if ("qwen3" in m.get("id", "") or m.get("id") == "gpt-oss-120b") and m not in embedder_models]
     cloud_models = [m for m in all_models if m.get("provider") in ("gemini", "openai", "anthropic") and m not in kloudeks_models and m not in embedder_models]
+    openrouter_models = [m for m in all_models if m.get("provider") == "openrouter" and m not in embedder_models]
     hf_models = [m for m in all_models if m.get("provider") == "huggingface" and m not in kloudeks_models and m not in embedder_models]
     mock_models = [m for m in all_models if m.get("provider") == "mock"]
 
-    tab_cloud, tab_hf, tab_embed, tab_mock = st.sidebar.tabs([
+    tab_cloud, tab_or, tab_hf, tab_embed, tab_mock = st.sidebar.tabs([
         "🌐 Bulut Servisleri",
-        "🤗 Açık Kaynak",
+        "🔀 OpenRouter",
+        "🤗 Açık Kaynak (HF)",
         "🧬 Vektör & Embedder",
         "🧪 Test & Simülasyon"
     ])
@@ -96,9 +98,11 @@ def render_sidebar() -> SidebarState:
             provider = m.get("provider", "")
             deg = Config.model_bdr_degerlendirmesi(m, bdr_karakter)
 
+            # Config'deki 'enabled' bayrağı burada kasıtlı olarak yok sayılır — hiçbir
+            # model başta seçili gelmez, her çalıştırmada kullanıcı kendisi seçer.
             secildi = st.checkbox(
                 f"{deg['rozet']} {model_name}",
-                value=m.get("enabled", False),
+                value=False,
                 key=f"chk_{model_id}",
             )
 
@@ -122,6 +126,10 @@ def render_sidebar() -> SidebarState:
 
     with tab_cloud:
         _render_model_cards(cloud_models)
+
+    with tab_or:
+        st.caption("OpenRouter, aynı açık kaynak modeli birden fazla altyapı sağlayıcısı (Cerebras/Groq/Fireworks/DeepInfra vb.) üzerinden yönlendirir — tek sağlayıcılı HF endpoint'lerinden daha dayanıklıdır. API anahtarı: `OPENROUTER_API_KEY`.")
+        _render_model_cards(openrouter_models)
 
     with tab_hf:
         st.markdown("#### 🏛️ Kloudeks Mia (KKB Kurumsal Altyapı)")
@@ -188,9 +196,9 @@ def render_sidebar() -> SidebarState:
     }
 
     try:
-        run_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", width="stretch")
+        run_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT (Model Kıyaslama)", type="primary", width="stretch")
     except TypeError:
-        run_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT", type="primary", use_container_width=True)
+        run_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT (Model Kıyaslama)", type="primary", use_container_width=True)
 
     return SidebarState(
         bdr_content=bdr_content,

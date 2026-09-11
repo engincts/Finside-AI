@@ -1,0 +1,26 @@
+
+{
+  "bdr_dosya": "<bdr_stem>.txt",
+  "firma_adi": "",
+  "beklenen_denetci_gorusu": "Olumlu Görüş",
+  "beklenen_karar_araligi": [
+    "Şartlı Olumlu (Finansal Covenant / Taahhüt Şartlı)",
+    "Şartlı Olumlu (Ek Teminat / Limit Kısıtlaması Bağlı)"
+  ],
+  "beklenen_riskler": [
+    {
+      "kategori": "Teminat, Rehin, İpotek (TRİ) ve Varlık Kısıtlamaları",
+      "kisa_baslik": "Bağlı ortaklıklar lehine verilen TRİ yükü",
+      "anahtar_tutar": "6.897.006 bin TL",
+      "kaynak_ipucu": "Dipnot 21",
+      "onem": "kritik"
+    },
+    {
+      "kategori": "Net Yabancı Para Pozisyonu, Kur ve Faiz Oranı Riski",
+      "kisa_baslik": "Net yabancı para açık pozisyonu",
+      "anahtar_tutar": "1.959.702 bin TL",
+      "kaynak_ipucu": "Dipnot 35",
+      "onem": "yuksek"
+    }
+  ]
+}

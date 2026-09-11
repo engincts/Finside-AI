@@ -18,6 +18,11 @@ Görevin: taslakta EKSİK kalmış, gözden kaçmış kalitatif kredi risklerini
   içeren. Genel kategori etiketi ("X Riski", "Y Yönetimi"), denetim raporu standart
   ifadeleri (bağımsızlık, etik uyum, yönetim sorumluluğu, TFRS uyumu) veya içi boş
   başlık EKLEME.
+- **DENETÇİ ŞABLON METNİ**: "Bağımsız Denetçinin Sorumlulukları" bölümündeki değişmez
+  ifadeler ("...sürekliliğe ilişkin ciddi şüphe ... belirsizlik ... sonuca varırız",
+  "...tespit ettiğimiz önemli iç kontrol eksiklikleri dâhil ... bildirmekteyiz",
+  "makul güvence") denetçinin YÖNTEMİDİR — going-concern veya iç kontrol riski olarak EKLEME.
+  Gerçek going-concern ancak ayrı "Önemli Belirsizlik" paragrafı / modifiye görüş varsa.
 - **Tek ardışık alıntı**: Eklediğin kalemin `kaynak_metin_alintisi` alanı, metinde
   BİREBİR geçen TEK, ARDIŞIK bir parça olmalıdır. Birden fazla cümleyi/uzak sayıyı "..."
   ile BİRLEŞTİRME — temsili tek parçayı alıntıla, kalanları `detay`'a düz metin yaz.

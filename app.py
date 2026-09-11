@@ -27,7 +27,6 @@ ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "src"))
 
-from config import Config
 from finside.loaders import PromptLoader
 from finside.models import BenchmarkRequest
 from finside.services.benchmark_service import BenchmarkService
@@ -38,6 +37,7 @@ from finside.ui.tabs import (
     render_prompt_tab,
     render_input_tab,
     render_pipeline_tab,
+    render_pipeline_report_tab,
 )
 
 # Custom Executive UI CSS Styling
@@ -68,9 +68,8 @@ ui_state = render_sidebar()
 
 # Handle Benchmark Run Action
 if ui_state.run_btn and ui_state.selected_model_ids:
-    status_box = st.status("🚀 **BDR Analiz Süreci Başlatıldı...**", expanded=True)
+    status_box = st.status(f"{len(ui_state.selected_model_ids)} model çalışıyor...", expanded=False)
     with status_box:
-        st.write("📄 **Adım 1:** BDR metni ayrıştırılıyor ve model parametreleri yapılandırılıyor...")
         request = BenchmarkRequest(
             selected_model_ids=ui_state.selected_model_ids,
             bdr_content=ui_state.bdr_content,
@@ -80,11 +79,8 @@ if ui_state.run_btn and ui_state.selected_model_ids:
             system_prompt=st.session_state.active_system_prompt,
             user_template=st.session_state.active_user_template,
         )
-        st.write(f"🤖 **Adım 2:** Seçilen {len(ui_state.selected_model_ids)} AI modeli eşzamanlı olarak metni ve dipnotları tarıyor...")
         results_list, metrics_summary_list, zaman_asimi, session_dir = BenchmarkService.run_benchmark_suite(request)
-        st.write("🔍 **Adım 3:** Model çıktıları konsolide ediliyor ve QA kuralları doğrulanıyor...")
-        st.write(f"💾 **Adım 4:** Raporlar diske yazıldı: `{session_dir}`")
-        status_box.update(label="✅ **Analiz Başarıyla Tamamlandı!**", state="complete", expanded=False)
+        status_box.update(label="Analiz tamamlandı", state="complete")
 
     if zaman_asimi:
         st.warning(f"⏱️ {len(zaman_asimi)} model zaman aşımına takıldı: {', '.join(zaman_asimi)}")
@@ -95,18 +91,26 @@ if ui_state.run_btn and ui_state.selected_model_ids:
     else:
         st.error("❌ Hiçbir model zamanında yanıt veremedi.")
 
-# Render Main View Tabs
-t1, t2, t3, t4, t5 = st.tabs([
-    "📊 Karşılaştırma Paneli",
-    "🤖 Model Çıktı Raporları",
-    "📝 Canlı Prompt Düzenleyici",
-    "📄 BDR Metin Görünümü",
-    "🔗 Multi-Agent Pipeline"
+# Render Main View Tabs — üç ana grup (her biri hangi sistem olduğunu isimden belli eder),
+# her grubun altında kendi alt sekmeleri.
+grup_kiyas, grup_pipeline, grup_araclar = st.tabs([
+    "📊 Model Kıyaslama",
+    "🔗 Multi-Agent Pipeline",
+    "🛠️ Araçlar",
 ])
 
-with t1: render_overview_tab(ui_state.bdr_name, ui_state.is_mock_mode)
-with t2: render_reports_tab()
-with t3: render_prompt_tab()
-with t4: render_input_tab(ui_state.bdr_name, ui_state.bdr_content)
-with t5: render_pipeline_tab(ui_state.bdr_name, ui_state.bdr_content)
+with grup_kiyas:
+    kt1, kt2 = st.tabs(["Özet", "Raporlar"])
+    with kt1: render_overview_tab(ui_state.bdr_name, ui_state.is_mock_mode)
+    with kt2: render_reports_tab()
+
+with grup_pipeline:
+    pt1, pt2 = st.tabs(["Çalıştır", "Rapor"])
+    with pt1: render_pipeline_tab(ui_state.bdr_name, ui_state.bdr_content)
+    with pt2: render_pipeline_report_tab()
+
+with grup_araclar:
+    at1, at2 = st.tabs(["Prompt Düzenleyici", "BDR Metni"])
+    with at1: render_prompt_tab()
+    with at2: render_input_tab(ui_state.bdr_name, ui_state.bdr_content)
 

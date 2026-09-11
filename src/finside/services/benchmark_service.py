@@ -1,6 +1,5 @@
-import time
 from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple
 from pathlib import Path
 
 from config import Config

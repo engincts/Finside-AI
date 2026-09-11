@@ -10,13 +10,14 @@ load_dotenv(BASE_DIR / ".env")
 CONFIG_JSON_PATH = BASE_DIR / "config.json"
 
 PIPELINE_DEFAULTS: Dict[str, Any] = {
-    "map_models": ["qwen3-coder-30b", "gpt-oss-120b"],
-    "triage_model": "qwen3-omni-30b",
-    "reconciler_model": "gpt-oss-120b",
-    "critic_model": "gpt-oss-120b",
-    "sanitizer_model": "qwen3-omni-30b",
-    "synthesis_model": "gpt-oss-120b",
-    "segmenter_fallback_model": "qwen3-omni-30b",
+    "map_models": ["gpt-4o"],
+    "triage_model": "gpt-4o-mini",
+    "reconciler_model": "gpt-4o",
+    "critic_model": "gpt-4o",
+    "sanitizer_model": "gpt-4o-mini",
+    "synthesis_model": "gpt-4o",
+    "segmenter_fallback_model": "gpt-4o",
+    "fallback_model": "or-gpt-oss-120b",
     "segmenter_guven_esigi": 0.6,
     "segment_grup_karakter_butcesi": 88000,
     "grounding_esigi": 85,
@@ -48,6 +49,7 @@ class Config:
 
     PROVIDER_INPUT_LIMITS: Dict[str, int] = {
         "huggingface": 250_000,
+        "openrouter": 350_000,
         "openai": 480_000,
         "anthropic": 760_000,
         "gemini": 3_800_000,
@@ -66,14 +68,7 @@ class Config:
     BASLIK_BENZERLIK_ESIGI: int = 90
     EMBED_API_KEY_ENV: str = "OPENAI_API_KEY"
 
-    # 5. Segmentasyon Ayarları (BDR Segmentation)
-    BEKLENEN_MIN_SEGMENT: int = 12
-    BEKLENEN_MAX_SEGMENT: int = 90
-    MIN_SEGMENT_KARAKTER: int = 300
-    YETERLI_SEGMENT: int = 10
-    LLM_GIRDI_KARAKTER_SINIRI: int = 200_000
-
-    # 6. LLM Token & Reasoning Haritası
+    # 5. LLM Token & Reasoning Haritası
     EFFORT_TOKEN_MAP: Dict[str, int] = {
         "low": 2048,
         "medium": 4096,
@@ -82,12 +77,18 @@ class Config:
     }
 
     _config_data: Optional[Dict[str, Any]] = None
+    _config_mtime: Optional[float] = None
 
     @classmethod
     def load_config(cls, force_reload: bool = False) -> Dict[str, Any]:
-        if cls._config_data is None or force_reload:
+        # Streamlit gibi uzun ömürlü process'lerde config.json elle düzenlenip kaydedilince
+        # dosya mtime'ı değişmiş olur — reload'u tetikler, aksi halde ilk açılıştaki config
+        # process ömrü boyunca önbellekte kalır (restart olmadan değişiklik görünmez).
+        mtime = CONFIG_JSON_PATH.stat().st_mtime
+        if cls._config_data is None or force_reload or mtime != cls._config_mtime:
             with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
                 cls._config_data = json.load(f)
+            cls._config_mtime = mtime
         return cls._config_data
 
     @classmethod
@@ -133,13 +134,6 @@ class Config:
                 merged = {**defaults, **m}
                 merged_models.append(merged)
         return merged_models
-
-    @classmethod
-    def get_model_by_id(cls, model_id: str) -> Optional[Dict[str, Any]]:
-        for m in cls.get_enabled_models():
-            if m.get("id") == model_id:
-                return m
-        return None
 
     @classmethod
     def get_api_key_for_model(cls, model_config: Dict[str, Any]) -> str:
