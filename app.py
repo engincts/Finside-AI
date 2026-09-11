@@ -37,6 +37,7 @@ from finside.ui.tabs import (
     render_prompt_tab,
     render_input_tab,
     render_pipeline_tab,
+    render_pipeline_report_tab,
 )
 
 # Custom Executive UI CSS Styling
@@ -90,18 +91,20 @@ if ui_state.run_btn and ui_state.selected_model_ids:
     else:
         st.error("❌ Hiçbir model zamanında yanıt veremedi.")
 
-# Render Main View Tabs
-t1, t2, t3, t4, t5 = st.tabs([
-    "📊 Karşılaştırma Paneli",
-    "🤖 Model Çıktı Raporları",
-    "📝 Canlı Prompt Düzenleyici",
-    "📄 BDR Metin Görünümü",
-    "🔗 Multi-Agent Pipeline"
+# Render Main View Tabs (isim önekleri hangi sistemin çıktısı olduğunu ayırt eder)
+t1, t2, t3, t4, t5, t6 = st.tabs([
+    "📊 Kıyaslama — Özet",
+    "🤖 Kıyaslama — Raporlar",
+    "🔗 Pipeline — Çalıştır",
+    "🧩 Pipeline — Rapor",
+    "📝 Prompt Düzenleyici",
+    "📄 BDR Metni",
 ])
 
 with t1: render_overview_tab(ui_state.bdr_name, ui_state.is_mock_mode)
 with t2: render_reports_tab()
-with t3: render_prompt_tab()
-with t4: render_input_tab(ui_state.bdr_name, ui_state.bdr_content)
-with t5: render_pipeline_tab(ui_state.bdr_name, ui_state.bdr_content)
+with t3: render_pipeline_tab(ui_state.bdr_name, ui_state.bdr_content)
+with t4: render_pipeline_report_tab()
+with t5: render_prompt_tab()
+with t6: render_input_tab(ui_state.bdr_name, ui_state.bdr_content)
 

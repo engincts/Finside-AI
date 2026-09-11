@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any, List
 import streamlit as st
 from langgraph.checkpoint.memory import MemorySaver
@@ -212,13 +213,7 @@ def render_input_tab(bdr_name: str, bdr_content: str):
 def render_pipeline_tab(bdr_name: str, bdr_content: str):
     """Multi-Agent Pipeline sekmesini çizer."""
     st.subheader("🔗 Multi-Agent BDR Analiz Pipeline")
-    st.caption("Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA.")
-    st.warning(
-        "⚠️ **Bu sekme sol menüdeki '🚀 ANALİZİ BAŞLAT (Model Kıyaslama)' butonundan tamamen "
-        "AYRIDIR ve ondan tetiklenmez.** Sol menü seçtiğiniz her modeli tek başına (triyaj/critic/sentez "
-        "ajanı olmadan) çalıştırır. Gerçek çok-ajanlı akışı başlatmak için modelleri aşağıdan seçip "
-        "bu sekmedeki **'🔗 PIPELINE BAŞLAT'** butonuna basmanız gerekir."
-    )
+    st.caption("Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA. Sol menüdeki Model Kıyaslama'dan bağımsız, kendi butonuyla çalışır.")
 
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
@@ -325,6 +320,8 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
     except TypeError:
         pipeline_btn = st.button("🔗 PIPELINE BAŞLAT", type="primary", use_container_width=True, disabled=not calistirilabilir)
 
+    st.caption("Sonuç hazır olunca **'🧩 Pipeline — Rapor'** sekmesinde görünür.")
+
     if pipeline_btn and calistirilabilir:
         pipe_session_dir, _ = ReportWriter.create_session_directory(bdr_name)
         pipe_graph = build_graph(checkpointer=MemorySaver())
@@ -361,25 +358,45 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         nihai = (son_guncelleme.get("maliyet_ozetle") or {}).get("nihai_rapor") \
             or (son_guncelleme.get("qa_kontrol") or {}).get("nihai_rapor")
         st.session_state.pipeline_sonucu = {"nihai": nihai, "dizin": str(pipe_session_dir)}
-        st.success(f"✅ Pipeline tamamlandı: `{pipe_session_dir}`")
+        st.success(f"✅ Pipeline tamamlandı: `{pipe_session_dir}` — sonuç **'🧩 Pipeline — Rapor'** sekmesinde.")
 
+
+def render_pipeline_report_tab():
+    """Pipeline'ın ürettiği nihai raporu, Model Çıktı Raporları ile aynı düzende gösterir.
+    Yeniden pipeline çalıştırılana kadar (session_state) olduğu gibi durur."""
     pipe_sonuc = st.session_state.get("pipeline_sonucu")
-    if pipe_sonuc and pipe_sonuc.get("nihai"):
-        nr = pipe_sonuc["nihai"]
-        st.markdown("---")
-        c1, c2, c3 = st.columns(3)
-        c1.info(f"**Firma:** {nr.get('firma_adi')}")
-        c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or '—'}")
-        c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+    if not (pipe_sonuc and pipe_sonuc.get("nihai")):
+        st.info("👈 Henüz bir pipeline çalıştırılmadı. **'🔗 Pipeline — Çalıştır'** sekmesinden başlatabilirsiniz.")
+        return
 
-        try:
-            _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"))
-        except Exception:
-            _md = None
+    st.subheader("🧩 Multi-Agent Pipeline — Nihai Rapor")
+    nr = pipe_sonuc["nihai"]
 
+    c1, c2, c3 = st.columns(3)
+    c1.info(f"**Firma:** {nr.get('firma_adi')}")
+    c2.success(f"**Denetçi Görüşü:** {nr.get('denetci_gorusu') or 'Belirtilmemiş'}")
+    c3.warning(f"**Karar Eğilimi:** {nr.get('karar_egilimi')}")
+
+    try:
+        _md = report_to_markdown(_Rapor.model_validate(nr), pipeline_izi=nr.get("pipeline_izi"))
+    except Exception:
+        _md = None
+
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
         if _md:
-            st.download_button("⬇️ Nihai Raporu İndir (.md)", data=_md, file_name="nihai_rapor.md", mime="text/markdown")
-            with st.container(height=600):
-                st.markdown(_md)
-        with st.expander("Nihai rapor (JSON)"):
-            st.json(nr)
+            st.download_button("⬇️ Raporu İndir (.md)", data=_md, file_name="pipeline_nihai_rapor.md", mime="text/markdown")
+    with col_dl2:
+        st.download_button(
+            "⬇️ Ham Veriyi İndir (.json)",
+            data=json.dumps(nr, ensure_ascii=False, indent=2),
+            file_name="pipeline_nihai_rapor.json",
+            mime="application/json",
+        )
+
+    st.markdown("---")
+    if _md:
+        with st.container(height=600):
+            st.markdown(_md)
+    with st.expander("Nihai rapor (JSON)"):
+        st.json(nr)

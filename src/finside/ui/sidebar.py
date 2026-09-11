@@ -28,14 +28,7 @@ def render_sidebar() -> SidebarState:
 
     st.sidebar.image("https://img.icons8.com/color/96/000000/bank-building.png", width=65)
     st.sidebar.title("⚙️ Kontrol Paneli")
-    st.sidebar.caption(
-        "💡 Bu panel **tek-geçiş / model kıyaslama** modudur: aşağıda işaretlediğiniz her modeli "
-        "birbirinden bağımsız, paralel çalıştırır (triyaj/critic/sentez ajanı YOK — sonuç "
-        "**📊 Karşılaştırma Paneli** sekmesine düşer). BDR büyükse tek model de içeride "
-        "parça-parça (map-reduce) birden fazla çağrı yapabilir; bu normaldir, Multi-Agent "
-        "Pipeline değildir. Gerçek çok-ajanlı akış (Triyaj→Ensemble→Uzlaştırma→Critic→Sentez) "
-        "için **🔗 Multi-Agent Pipeline** sekmesindeki ayrı butonu kullanın."
-    )
+    st.sidebar.caption("💡 Bu panel **Model Kıyaslama**dır (her modeli tek başına çalıştırır). Çok-ajanlı akış için **Pipeline** sekmelerini kullanın.")
 
     st.sidebar.markdown("---")
 
@@ -202,7 +195,6 @@ def render_sidebar() -> SidebarState:
         "repetition_penalty": override_rep_penalty,
     }
 
-    st.sidebar.caption("👉 Bu buton **tek-geçiş model kıyaslama**dır, Multi-Agent Pipeline'ı ÇALIŞTIRMAZ.")
     try:
         run_btn = st.sidebar.button("🚀 ANALİZİ BAŞLAT (Model Kıyaslama)", type="primary", width="stretch")
     except TypeError:
