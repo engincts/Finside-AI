@@ -220,6 +220,10 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
     pipeline_cfg = config_data.get("pipeline", {})
     bdr_karakter = len(bdr_content)
     _deg = {m["id"]: Config.model_bdr_degerlendirmesi(m, bdr_karakter) for m in all_models if m.get("id")}
+    _ad = {m["id"]: m.get("name", m["id"]) for m in all_models if m.get("id")}
+
+    def _model_etiketi(mid: str) -> str:
+        return f"{_deg[mid]['rozet']} {_ad.get(mid, mid)} — {_deg[mid]['ozet']}"
 
     model_secenekleri = [mid for mid in _deg if _deg[mid]["secilebilir"]]
     varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
@@ -227,14 +231,14 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         f"Ensemble Map Modelleri (Eşzamanlı Taramayı Yapacak AI Modelleri)  ·  BDR ~{bdr_karakter // 1000}k karakter",
         options=model_secenekleri,
         default=varsayilan_ensemble or model_secenekleri[:1],
-        format_func=lambda mid: f"{_deg[mid]['rozet']} {mid} — {_deg[mid]['ozet']}",
+        format_func=_model_etiketi,
         help="Bu alanda işaretlediğiniz tüm modeller BDR metnini eşzamanlı olarak tarar. config.json dosyasındaki 'map_models' yalnızca ilk varsayılan seçimdir; buradan yaptığınız seçim geçerli olur."
     )
     st.info("💡 **Bilgi:** Burada seçtiğiniz modeller `Ensemble Map` aşamasında BDR parçalarını eşzamanlı tarar. Uzlaştırma, Critic ve Sentez rollerini aşağıdan özelleştirebilirsiniz.")
 
     for mid in secili_ensemble:
         for uyari in _deg[mid]["uyarilar"]:
-            st.caption(f"⚠️ {mid}: {uyari}")
+            st.caption(f"⚠️ {_ad.get(mid, mid)}: {uyari}")
 
     with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)"):
         st.caption("Triyaj, Uzlaştırma, Eleştirmen (Critic), Temizlik (Sanitizer) ve Sentez aşamalarında kullanılacak modelleri seçebilirsiniz:")
@@ -249,6 +253,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
             "🎯 Triyaj (Triage) Modeli",
             options=model_secenekleri,
             index=t_idx,
+            format_func=_model_etiketi,
             help="200+ sayfalık BDR metin parçalarını hızla tarayarak kredi riski taşıma ihtimali yüksek kilit dipnotları önceliklendirir."
         )
         st.caption("💡 **Triyaj Ajanı:** BDR bölümlerini taranacaklar / elenecekler olarak hızlı ön sınıflandırmaya tabi tutar.")
@@ -257,6 +262,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
             "🤝 Uzlaştırma (Reconciler) Modeli",
             options=model_secenekleri,
             index=r_idx,
+            format_func=_model_etiketi,
             help="Ensemble modellerinden gelen ham risk bulgularını eşleştirir, tekrarları eler ve çelişkileri uzlaştırır."
         )
         st.caption("💡 **Uzlaştırma Ajanı:** Farklı modellerin bulduğu ham riskleri anlamsal kümeleyip deduplikasyon yapar.")
@@ -265,6 +271,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
             "🕵️ Eleştirmen (Critic) Modeli",
             options=model_secenekleri,
             index=c_idx,
+            format_func=_model_etiketi,
             help="Uzlaştırılmış bulguları BDR dipnot metinleriyle çapraz denetler; halüsinasyon ve asılsız iddiaları eler."
         )
         st.caption("💡 **Eleştirmen Ajanı:** Bulguları BDR orijinal metniyle grounding testine tabi tutar, kanıtsız riskleri geri çevirir.")
@@ -273,6 +280,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
             "🧹 Temizlik (Sanitizer) Modeli",
             options=model_secenekleri,
             index=san_idx,
+            format_func=_model_etiketi,
             help="Jenerik etki cümlelerini ve risk mekanizması içermeyen yalın bilanço kalemlerini süzen hızlı filtre ajanı."
         )
         st.caption("💡 **Temizlik Ajanı:** Jenerik/şablon cümleleri somut etki analizleriyle günceller ve salt bilanço bakiyelerini rapordan temizler.")
@@ -281,6 +289,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
             "🧩 Sentez (Synthesis) Modeli",
             options=model_secenekleri,
             index=s_idx,
+            format_func=_model_etiketi,
             help="Tüm onaylı riskleri, finansal rasyoları ve denetçi görüşünü birleştirerek nihai kredilendirme raporunu oluşturur."
         )
         st.caption("💡 **Sentez Ajanı:** Doğrulanmış tüm bulguları ve rasyoları konsolide edip Kredi Komite Raporunu ve Karar Eğilimini yazar.")
