@@ -187,9 +187,9 @@
     },
     {
       "id": "or-deepseek-v3",
-      "name": "DeepSeek V3 (OpenRouter)",
+      "name": "DeepSeek V3.2 (OpenRouter)",
       "provider": "openrouter",
-      "model_name": "deepseek/deepseek-chat",
+      "model_name": "deepseek/deepseek-v3.2",
       "api_key_env": "OPENROUTER_API_KEY",
       "context_window": "64,000 Token",
       "reasoning_effort": "high",
@@ -197,9 +197,9 @@
       "temperature": 0.0,
       "top_p": 0.9,
       "prompt_file": "bdr_analyst_v1.md",
-      "usd_1k_in": 0.00027,
-      "usd_1k_out": 0.0011,
-      "durum_notu": "Güçlü genel muhakeme, uzun yapılandırılmış JSON'da iyi — reconciler/critic/sentez için gpt-oss-120b'ye alternatif. Finansal-özel fine-tune değil ama açık kaynak modeller arasında en güvenilir JSON üreticilerden.",
+      "usd_1k_in": 0.00021,
+      "usd_1k_out": 0.00031,
+      "durum_notu": "2026-09-11: 'deepseek/deepseek-chat' DeepSeek tarafında 24 Temmuz 2026'da kaldırıldı (V4 Flash'a geçiş), hata veriyordu — deepseek/deepseek-v3.2'ye geçirildi. Güçlü genel muhakeme, uzun yapılandırılmış JSON'da iyi — reconciler/critic/sentez için gpt-oss-120b'ye alternatif. Finansal-özel fine-tune değil ama açık kaynak modeller arasında en güvenilir JSON üreticilerden.",
       "enabled": true
     },
     {
