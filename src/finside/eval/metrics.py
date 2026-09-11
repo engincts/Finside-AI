@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 from finside.dedupe import _is_jenerik_etki, _onemli_sayilar
 from finside.models import BDRRiskAnalysisReport, RiskKategorisi
 from finside.pipeline.grounding import ground_riskler
-from finside.pipeline.qa_rules import qa_bayraklari
+from finside.pipeline.qa_rules import _buyuklukce_yakin, _DIPNOT_ONEK_RE, _olcekli_degerler, qa_bayraklari
 
 _GROUNDING_ESIGI = 85.0
 _TOPLAM_KATEGORI = len(RiskKategorisi)
@@ -32,15 +32,24 @@ def grounding_metrigi(riskler: List[dict], bdr_metni: str) -> Dict[str, Any]:
 
 def sayisal_tutarlilik_metrigi(riskler: List[dict], bdr_metni: str) -> Dict[str, Any]:
     kaynak_sayilar = _onemli_sayilar(bdr_metni)
+    kaynak_tam = {int(s) for s in kaynak_sayilar}
     dogrulanan = 0
     sayili_kalem = 0
     tutarsiz_kalemler: List[str] = []
     for r in riskler:
-        kalem_sayilar = _onemli_sayilar(r.get("tutar_bilgisi") or "", r.get("baslik") or "")
+        baslik_temiz = _DIPNOT_ONEK_RE.sub("", r.get("baslik") or "")
+        kalem_sayilar = _onemli_sayilar(r.get("tutar_bilgisi") or "", baslik_temiz)
         if not kalem_sayilar:
             continue
         sayili_kalem += 1
-        if kalem_sayilar <= kaynak_sayilar:
+        eslesmeyen = kalem_sayilar - kaynak_sayilar
+        if eslesmeyen:
+            olcekli = _olcekli_degerler(f"{r.get('tutar_bilgisi') or ''} {baslik_temiz}")
+            eslesmeyen = {
+                s for s in eslesmeyen
+                if not any(_buyuklukce_yakin(o, kaynak_tam) for o in olcekli)
+            }
+        if not eslesmeyen:
             dogrulanan += 1
         else:
             tutarsiz_kalemler.append(r.get("baslik") or "?")
