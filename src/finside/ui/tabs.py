@@ -121,6 +121,11 @@ def render_prompt_tab():
     """Prompt Düzenleyici sekmesini çizer."""
     st.subheader("📝 Canlı Prompt Düzenleme & İnceleme Paneli")
     st.caption("Aşağıdaki alanlardan System Prompt ve User Prompt metinlerini canlı olarak düzenleyebilirsiniz:")
+    st.info(
+        "ℹ️ Buradaki canlı metin yalnızca **Model Kıyaslama** panelinde kullanılır. "
+        "**Multi-Agent Pipeline** her zaman diskteki `prompts/bdr_analyst_v1.md` dosyasını okur — "
+        "değişikliğin pipeline'a da yansıması için **'💾 1. Değişiklikleri Kaydet'** ile dosyaya yazmanız gerekir."
+    )
 
     # Dosyadaki mevcut halini oku (Senkronizasyon kontrolü için)
     target_prompt_file = Config.BASE_DIR / "prompts" / PROMPT_FILE_NAME
