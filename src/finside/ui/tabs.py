@@ -213,7 +213,12 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
     """Multi-Agent Pipeline sekmesini çizer."""
     st.subheader("🔗 Multi-Agent BDR Analiz Pipeline")
     st.caption("Segmentasyon → Triyaj → Ensemble Map → Grounding / Uzlaştırma / Critic → Sentez → QA.")
-    st.warning("Bu sekme Karşılaştırma Paneli'nden bağımsızdır.")
+    st.warning(
+        "⚠️ **Bu sekme sol menüdeki '🚀 ANALİZİ BAŞLAT (Model Kıyaslama)' butonundan tamamen "
+        "AYRIDIR ve ondan tetiklenmez.** Sol menü seçtiğiniz her modeli tek başına (triyaj/critic/sentez "
+        "ajanı olmadan) çalıştırır. Gerçek çok-ajanlı akışı başlatmak için modelleri aşağıdan seçip "
+        "bu sekmedeki **'🔗 PIPELINE BAŞLAT'** butonuna basmanız gerekir."
+    )
 
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
