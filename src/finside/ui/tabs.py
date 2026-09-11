@@ -217,6 +217,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
 
     config_data = Config.load_config()
     all_models = config_data.get("models", [])
+    pipeline_cfg = config_data.get("pipeline", {})
     bdr_karakter = len(bdr_content)
     _deg = {m["id"]: Config.model_bdr_degerlendirmesi(m, bdr_karakter) for m in all_models if m.get("id")}
     _ad = {m["id"]: m.get("name", m["id"]) for m in all_models if m.get("id")}
@@ -225,12 +226,13 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         return f"{_deg[mid]['rozet']} {_ad.get(mid, mid)} — {_deg[mid]['ozet']}"
 
     model_secenekleri = [mid for mid in _deg if _deg[mid]["secilebilir"]]
+    varsayilan_ensemble = [m for m in pipeline_cfg.get("map_models", []) if m in model_secenekleri]
     secili_ensemble = st.multiselect(
         f"Ensemble Map Modelleri (Eşzamanlı Taramayı Yapacak AI Modelleri)  ·  BDR ~{bdr_karakter // 1000}k karakter",
         options=model_secenekleri,
-        default=[],
+        default=varsayilan_ensemble,
         format_func=_model_etiketi,
-        help="Hiçbir model başta seçili gelmez — her çalıştırmada burada kendiniz seçersiniz. İşaretlediğiniz tüm modeller BDR metnini eşzamanlı olarak tarar."
+        help="Varsayılan seçim config.json → pipeline.map_models. Buradan değiştirebilir veya boşaltıp kendi seçiminizi yapabilirsiniz — boşsa pipeline başlatılamaz."
     )
     st.info("💡 **Bilgi:** Burada seçtiğiniz modeller `Ensemble Map` aşamasında BDR parçalarını eşzamanlı tarar. Uzlaştırma, Critic ve Sentez rollerini aşağıdan özelleştirebilirsiniz.")
 
@@ -238,13 +240,17 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         for uyari in _deg[mid]["uyarilar"]:
             st.caption(f"⚠️ {_ad.get(mid, mid)}: {uyari}")
 
+    def _cfg_idx(rol: str) -> int | None:
+        deger = pipeline_cfg.get(rol)
+        return model_secenekleri.index(deger) if deger in model_secenekleri else None
+
     with st.expander("🎛️ Pipeline Ajan Rollerini Özelleştir (Triyaj / Reconciler / Critic / Sanitizer / Sentez Modelleri)", expanded=True):
-        st.caption("Hiçbir rol başta seçili gelmez — pipeline'ı başlatmadan önce hepsini kendiniz seçmelisiniz:")
+        st.caption("Varsayılan seçim config.json → pipeline'daki role uygun model (rol başına en makul açık kaynak seçenek); istediğiniz gibi değiştirebilirsiniz.")
 
         pipe_triage = st.selectbox(
             "🎯 Triyaj (Triage) Modeli",
             options=model_secenekleri,
-            index=None,
+            index=_cfg_idx("triage_model"),
             placeholder="Model seçin",
             format_func=_model_etiketi,
             help="200+ sayfalık BDR metin parçalarını hızla tarayarak kredi riski taşıma ihtimali yüksek kilit dipnotları önceliklendirir."
@@ -254,7 +260,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_reconciler = st.selectbox(
             "🤝 Uzlaştırma (Reconciler) Modeli",
             options=model_secenekleri,
-            index=None,
+            index=_cfg_idx("reconciler_model"),
             placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Ensemble modellerinden gelen ham risk bulgularını eşleştirir, tekrarları eler ve çelişkileri uzlaştırır."
@@ -264,7 +270,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_critic = st.selectbox(
             "🕵️ Eleştirmen (Critic) Modeli",
             options=model_secenekleri,
-            index=None,
+            index=_cfg_idx("critic_model"),
             placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Uzlaştırılmış bulguları BDR dipnot metinleriyle çapraz denetler; halüsinasyon ve asılsız iddiaları eler."
@@ -274,7 +280,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_sanitizer = st.selectbox(
             "🧹 Temizlik (Sanitizer) Modeli",
             options=model_secenekleri,
-            index=None,
+            index=_cfg_idx("sanitizer_model"),
             placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Jenerik etki cümlelerini ve risk mekanizması içermeyen yalın bilanço kalemlerini süzen hızlı filtre ajanı."
@@ -284,7 +290,7 @@ def render_pipeline_tab(bdr_name: str, bdr_content: str):
         pipe_synthesis = st.selectbox(
             "🧩 Sentez (Synthesis) Modeli",
             options=model_secenekleri,
-            index=None,
+            index=_cfg_idx("synthesis_model"),
             placeholder="Model seçin",
             format_func=_model_etiketi,
             help="Tüm onaylı riskleri, finansal rasyoları ve denetçi görüşünü birleştirerek nihai kredilendirme raporunu oluşturur."
