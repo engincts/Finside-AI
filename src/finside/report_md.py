@@ -178,19 +178,28 @@ def report_to_markdown(
     sure_val = report.analiz_suresi_saniye
     sure_str = f"{sure_val:.2f} saniye" if isinstance(sure_val, (int, float)) and sure_val > 0 else "Tamamlandı"
 
-    map_modelleri = ", ".join(pipe_cfg.get("map_models", [])) if pipe_cfg.get("map_models") else report.kullanilan_model or "Belirtilmemiş"
+    def _ad(model_id: str) -> str:
+        # Rol haritasında ham config id'si ("or-gpt-oss-120b") değil, config.json'daki
+        # okunabilir "name" alanı ("GPT-OSS-120B (OpenRouter)") gösterilir.
+        cfg = Config.get_model_config_by_id(model_id)
+        return cfg.get("name", model_id) if cfg else model_id
+
+    map_modelleri = (
+        ", ".join(_ad(m) for m in pipe_cfg.get("map_models", []))
+        if pipe_cfg.get("map_models") else _ad(report.kullanilan_model) if report.kullanilan_model else "Belirtilmemiş"
+    )
 
     lines += [
         "---",
         "### ⚙️ Rapor Üretim & Sistem Telemetrisi (Debug & Ajan Rol Haritası)",
         f"- **Analiz Süresi:** `{sure_str}`",
         "- **Aşama & Görevli Model Rol Haritası:**",
-        f"  - 🎯 **Triyaj (Triage) Ajanı:** `{pipe_cfg.get('triage_model', 'gpt-oss-120b')}`",
+        f"  - 🎯 **Triyaj (Triage) Ajanı:** `{_ad(pipe_cfg.get('triage_model', 'gpt-oss-120b'))}`",
         f"  - 🗺️ **Map (Ensemble Taraması):** `{map_modelleri}`",
-        f"  - 🤝 **Uzlaştırma (Reconciler):** `{pipe_cfg.get('reconciler_model', 'gpt-oss-120b')}`",
-        f"  - 🕵️ **Eleştirmen (Critic):** `{pipe_cfg.get('critic_model', 'gpt-oss-120b')}`",
-        f"  - 🧹 **Temizlik (Sanitizer):** `{pipe_cfg.get('sanitizer_model', pipe_cfg.get('critic_model', 'gpt-oss-120b'))}`",
-        f"  - 🧩 **Sentez (Synthesis):** `{pipe_cfg.get('synthesis_model', 'gpt-oss-120b')}`",
+        f"  - 🤝 **Uzlaştırma (Reconciler):** `{_ad(pipe_cfg.get('reconciler_model', 'gpt-oss-120b'))}`",
+        f"  - 🕵️ **Eleştirmen (Critic):** `{_ad(pipe_cfg.get('critic_model', 'gpt-oss-120b'))}`",
+        f"  - 🧹 **Temizlik (Sanitizer):** `{_ad(pipe_cfg.get('sanitizer_model', pipe_cfg.get('critic_model', 'gpt-oss-120b')))}`",
+        f"  - 🧩 **Sentez (Synthesis):** `{_ad(pipe_cfg.get('synthesis_model', 'gpt-oss-120b'))}`",
     ]
 
     if pipeline_izi:

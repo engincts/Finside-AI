@@ -26,13 +26,20 @@ def _liste(guncelleme: dict, anahtar: str) -> list:
     return guncelleme.get(anahtar) or []
 
 
+def _ad(model_id: str) -> str:
+    """Ham config id'si ("or-gpt-oss-120b") yerine config.json'daki okunabilir
+    "name" alanını ("GPT-OSS-120B (OpenRouter)") döndürür."""
+    cfg = Config.get_model_config_by_id(model_id)
+    return cfg.get("name", model_id) if cfg else model_id
+
+
 def model_rolleri_satiri(map_modelleri: List[str]) -> str:
     pc = Config.get_pipeline_config()
     san_m = pc.get("sanitizer_model", pc.get("critic_model", "—"))
     return (
-        f"map (risk çıkarımı): {', '.join(map_modelleri) or '—'}  ·  "
-        f"triyaj: {pc['triage_model']}  ·  uzlaştırma: {pc['reconciler_model']}  ·  "
-        f"critic: {pc['critic_model']}  ·  sanitizer: {san_m}  ·  sentez: {pc['synthesis_model']}"
+        f"map (risk çıkarımı): {', '.join(_ad(m) for m in map_modelleri) or '—'}  ·  "
+        f"triyaj: {_ad(pc['triage_model'])}  ·  uzlaştırma: {_ad(pc['reconciler_model'])}  ·  "
+        f"critic: {_ad(pc['critic_model'])}  ·  sanitizer: {_ad(san_m)}  ·  sentez: {_ad(pc['synthesis_model'])}"
     )
 
 
